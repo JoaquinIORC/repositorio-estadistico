@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Iniciar sesión | Repositorio Estadístico{% endblock %}
+
+{% block contenido %}
+<div class="login">
+    <h1>Iniciar sesión</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit">Ingresar</button>
+    </form>
+</div>
+{% endblock %}

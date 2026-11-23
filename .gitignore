@@ -1,0 +1,15 @@
+.venv/
+.env
+.credenciales-local.txt
+__pycache__/
+*.py[cod]
+db.sqlite3
+/staticfiles/
+
+# Este sistema guarda solo enlaces: nunca versionar datos de pacientes
+*.xlsx
+*.xls
+*.csv
+*.sql
+*.dump
+*.backup
