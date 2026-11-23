@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Modulo
@@ -81,3 +81,15 @@ class PortadaTests(TestCase):
         for enlace in ('http://app.powerbi.com/x', 'javascript:alert(1)'):
             with self.subTest(enlace=enlace), self.assertRaises(ValidationError):
                 Modulo(nombre='Inseguro', enlace=enlace).full_clean()
+
+    @override_settings(DEBUG=True)
+    def test_en_desarrollo_acepta_http_solo_hacia_este_computador(self):
+        Modulo(nombre='Local', enlace='http://localhost:8000/').full_clean()
+        Modulo(nombre='Local', enlace='http://127.0.0.1:8000').full_clean()
+        for enlace in ('http://localhost.malo.cl/', 'http://localhost@malo.cl/', 'http://malo.cl/'):
+            with self.subTest(enlace=enlace), self.assertRaises(ValidationError):
+                Modulo(nombre='Inseguro', enlace=enlace).full_clean()
+
+    def test_fuera_de_desarrollo_no_acepta_localhost(self):
+        with self.assertRaises(ValidationError):
+            Modulo(nombre='Local', enlace='http://localhost:8000/').full_clean()

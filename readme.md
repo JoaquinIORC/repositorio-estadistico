@@ -29,6 +29,8 @@ Completar `DJANGO_SECRET_KEY` en `.env` y luego:
 .\.venv\Scripts\python manage.py runserver 127.0.0.1:8002
 ```
 
+Con `DJANGO_DEBUG=True` también se aceptan enlaces `http://localhost`, para conectar el percapitados local. En el servidor se exige siempre `https`.
+
 ## Despliegue en el servidor de percapitados
 
 Corre con su propio usuario de Linux, para que no pueda leer el `.env` de percapitados, y en el puerto 8002 (8000 y 8001 ya están en uso). Reemplazar `repositorio.ejemplo.cl` y `<url-del-repositorio>`.

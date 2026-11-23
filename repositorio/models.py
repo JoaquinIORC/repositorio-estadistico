@@ -1,5 +1,16 @@
-from django.core.validators import URLValidator
+import re
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+
+ENLACE_LOCAL = re.compile(r'http://(localhost|127\.0\.0\.1)(:\d+)?(/|$)')
+
+
+def validar_enlace(valor):
+    """Exige https; en desarrollo también acepta http hacia este mismo computador."""
+    if not valor.startswith('https://') and not (settings.DEBUG and ENLACE_LOCAL.match(valor)):
+        raise ValidationError('Use un enlace que comience con https://.')
 
 
 class Modulo(models.Model):
@@ -10,7 +21,7 @@ class Modulo(models.Model):
     enlace = models.URLField(
         max_length=500,
         blank=True,
-        validators=[URLValidator(schemes=['https'], message='Use un enlace que comience con https://.')],
+        validators=[validar_enlace],
         help_text=(
             'Sin enlace, el módulo aparece como "En preparación". En Power BI use un informe '
             'compartido con cuentas institucionales: un enlace "Publicar en la web" (view?r=) '
