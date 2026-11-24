@@ -31,6 +31,14 @@ class AccesoTests(TestCase):
 
         self.assertEqual(self.client.get(reverse('inicio')).status_code, 302)
 
+    def test_con_clave_incorrecta_anuncia_el_error(self):
+        respuesta = self.client.post(reverse('login'), {'username': 'ana', 'password': 'otra'})
+
+        self.assertContains(respuesta, 'role="alert"')
+
+    def test_el_ingreso_no_muestra_la_barra_superior(self):
+        self.assertNotContains(self.client.get(reverse('login')), 'class="barra"')
+
     def test_un_usuario_comun_no_administra(self):
         self.client.force_login(self.usuario)
 
@@ -71,6 +79,20 @@ class PortadaTests(TestCase):
         Modulo.objects.create(nombre='Tablero nuevo', enlace=ENLACE)
 
         self.assertContains(self.abrir(), 'Tablero nuevo: sin informar')
+
+    def test_el_sello_muestra_cada_corte_por_separado(self):
+        Modulo.objects.create(nombre='Tablero A', enlace=ENLACE, corte='Semana 47')
+        Modulo.objects.create(nombre='Tablero B', enlace=ENLACE, corte='Octubre 2026')
+
+        respuesta = self.abrir()
+
+        self.assertContains(respuesta, '<li>Tablero A: Semana 47</li>')
+        self.assertContains(respuesta, '<li>Tablero B: Octubre 2026</li>')
+
+    def test_el_enlace_avisa_que_abre_otra_pestana(self):
+        Modulo.objects.create(nombre='Tablero nuevo', enlace=ENLACE)
+
+        self.assertContains(self.abrir(), '(se abre en otra pestaña)', count=1)
 
     def test_un_modulo_inactivo_no_aparece(self):
         Modulo.objects.create(nombre='Tablero oculto', enlace=ENLACE, activo=False)
