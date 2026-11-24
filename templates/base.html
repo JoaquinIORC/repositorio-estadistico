@@ -6,7 +6,8 @@
     <title>{% block titulo %}Repositorio Estadístico{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/portal.css' %}">
 </head>
-<body>
+<body class="{% block clase_cuerpo %}{% endblock %}">
+    {% block encabezado %}
     <a class="saltar" href="#contenido">Saltar al contenido</a>
     <header class="barra">
         <a class="marca" href="{% url 'inicio' %}">Repositorio Estadístico</a>
@@ -21,6 +22,7 @@
         </div>
         {% endif %}
     </header>
+    {% endblock %}
     <main id="contenido" class="wrap" tabindex="-1">
         {% block contenido %}{% endblock %}
     </main>
