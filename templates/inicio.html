@@ -1,3 +1,4 @@
+
 {% extends 'base.html' %}
 
 {% block contenido %}
@@ -6,21 +7,49 @@
 
 <p class="sello" role="note">
     <strong>Último corte cargado:</strong>
-    {% for modulo in con_corte %}{{ modulo.nombre }}: {{ modulo.corte|default:"sin informar" }}{% if not forloop.last %} | {% endif %}{% empty %}todavía no hay cortes informados.{% endfor %}
+    {% for modulo in con_corte %}
+        {{ modulo.nombre }}: {{ modulo.corte|default:"sin informar" }}{% if not forloop.last %} | {% endif %}
+    {% empty %}
+        todavía no hay cortes informados.
+    {% endfor %}
 </p>
 
 <div class="grid">
     {% for modulo in modulos %}
-    {% if modulo.enlace %}<a class="card" href="{{ modulo.enlace }}" target="_blank" rel="noopener noreferrer">{% else %}<div class="card pendiente">{% endif %}
-        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
-        <span>
-            <b>{{ modulo.nombre }}</b>
-            <small>{{ modulo.descripcion }}</small>
-            {% if modulo.enlace %}<span class="oculto"> (se abre en otra pestaña)</span>{% else %}<span class="estado">En preparación</span>{% endif %}
-        </span>
-    {% if modulo.enlace %}</a>{% else %}</div>{% endif %}
+        {% if modulo.enlace %}
+            <a class="card" href="{{ modulo.enlace }}" target="_blank" rel="noopener noreferrer">
+        {% elif modulo.reportes.exists %}
+            <a class="card" href="{% url 'lista_reportes' modulo.id %}">
+        {% else %}
+            <div class="card pendiente">
+        {% endif %}
+
+            <span class="ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
+                </svg>
+            </span>
+
+            <span>
+                <b>{{ modulo.nombre }}</b>
+                <small>{{ modulo.descripcion }}</small>
+
+                {% if modulo.enlace %}
+                    <span class="oculto"> (se abre en otra pestaña)</span>
+                {% elif modulo.reportes.exists %}
+                    <span class="estado">Ver reportes</span>
+                {% else %}
+                    <span class="estado">En preparación</span>
+                {% endif %}
+            </span>
+
+        {% if modulo.enlace or modulo.reportes.exists %}
+            </a>
+        {% else %}
+            </div>
+        {% endif %}
     {% empty %}
-    <p class="intro">Todavía no hay herramientas publicadas.</p>
+        <p class="intro">Todavía no hay herramientas publicadas.</p>
     {% endfor %}
 </div>
 {% endblock %}

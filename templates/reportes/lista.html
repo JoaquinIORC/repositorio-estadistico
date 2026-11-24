@@ -1,0 +1,49 @@
+
+{% extends 'base.html' %}
+
+{% block contenido %}
+<h1>{{ modulo.nombre }}</h1>
+<p class="intro">{{ modulo.descripcion }}</p>
+
+<p class="sello" role="note">
+    <strong>Último corte:</strong>
+    {% if reportes %}
+        {{ reportes.0.mes|stringformat:"02d" }}/{{ reportes.0.anio }}
+    {% else %}
+        Sin reportes cargados
+    {% endif %}
+</p>
+
+<p>
+    <a href="{% url 'inicio' %}">← Volver al repositorio</a>
+</p>
+
+<div class="grid">
+    {% for reporte in reportes %}
+        <div class="card">
+            <span class="ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 4h10l6 6v10H4zM14 4v6h6M8 15h8M8 18h8"/>
+                </svg>
+            </span>
+
+            <span>
+                <b>{{ reporte.titulo }}</b>
+                <small>Período: {{ reporte.mes|stringformat:"02d" }}/{{ reporte.anio }}</small>
+                <small>Subido: {{ reporte.subido_en|date:"d/m/Y" }}</small>
+
+                <a href="{% url 'descargar_reporte' reporte.id %}">
+                    Descargar reporte
+                </a>
+            </span>
+        </div>
+    {% empty %}
+        <div class="card pendiente">
+            <span>
+                <b>Sin reportes disponibles</b>
+                <small>Este módulo todavía no tiene archivos publicados.</small>
+            </span>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
