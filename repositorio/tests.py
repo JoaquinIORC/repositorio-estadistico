@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import Modulo, Reporte, validar_archivo_reporte
+from .models import Categoria, Modulo, Reporte, validar_archivo_reporte
 
 ENLACE = 'https://app.powerbi.com/groups/me/reports/abc'
 
@@ -139,6 +139,94 @@ class PortadaTests(TestCase):
     def test_fuera_de_desarrollo_no_acepta_localhost(self):
         with self.assertRaises(ValidationError):
             Modulo(nombre='Local', enlace='http://localhost:8000/').full_clean()
+
+
+class CategoriaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        # Se parte sin los módulos iniciales, para controlar cada caso.
+        Modulo.objects.all().delete()
+        Categoria.objects.all().delete()
+
+    def abrir(self):
+        self.client.force_login(self.usuario)
+        return self.client.get(reverse('inicio'))
+
+    def test_agrupa_por_categoria_en_su_orden(self):
+        atencion = Categoria.objects.create(nombre='Atención de salud', orden=20)
+        registros = Categoria.objects.create(nombre='Registros y gestión', orden=10)
+        Modulo.objects.create(nombre='Urgencia', categoria=atencion, enlace=ENLACE)
+        Modulo.objects.create(nombre='REM', categoria=registros, enlace=ENLACE)
+
+        contenido = self.abrir().content.decode()
+
+        self.assertLess(contenido.index('Registros y gestión</h2>'), contenido.index('Atención de salud</h2>'))
+        self.assertLess(contenido.index('<b>REM</b>'), contenido.index('Atención de salud</h2>'))
+        self.assertGreater(contenido.index('<b>Urgencia</b>'), contenido.index('Atención de salud</h2>'))
+
+    def test_sin_categoria_va_al_final(self):
+        registros = Categoria.objects.create(nombre='Registros y gestión')
+        Modulo.objects.create(nombre='REM', categoria=registros, enlace=ENLACE)
+        Modulo.objects.create(nombre='Suelto', enlace=ENLACE)
+
+        contenido = self.abrir().content.decode()
+
+        self.assertLess(contenido.index('Otras herramientas</h2>'), contenido.index('<b>Suelto</b>'))
+        self.assertLess(contenido.index('<b>REM</b>'), contenido.index('Otras herramientas</h2>'))
+
+    def test_sin_ninguna_categoria_no_muestra_titulos(self):
+        Modulo.objects.create(nombre='Suelto', enlace=ENLACE)
+
+        respuesta = self.abrir()
+
+        self.assertContains(respuesta, '<b>Suelto</b>')
+        self.assertNotContains(respuesta, '<h2')
+
+    def test_una_categoria_sin_modulos_activos_no_aparece(self):
+        vacia = Categoria.objects.create(nombre='Campañas')
+        Modulo.objects.create(nombre='Invierno', categoria=vacia, activo=False)
+        Modulo.objects.create(nombre='Suelto', enlace=ENLACE)
+
+        self.assertNotContains(self.abrir(), 'Campañas')
+
+    def test_usa_el_color_de_la_categoria_y_el_icono_del_modulo(self):
+        verde = Categoria.objects.create(nombre='Atención de salud', color='verde')
+        Modulo.objects.create(nombre='Urgencia', categoria=verde, icono='pulso', enlace=ENLACE)
+
+        respuesta = self.abrir()
+
+        self.assertContains(respuesta, 'class="card color-verde"')
+        self.assertContains(respuesta, '<use href="#i-pulso"/>')
+
+    def test_la_etiqueta_nuevo(self):
+        Modulo.objects.create(nombre='Campaña de invierno', enlace=ENLACE, nuevo=True)
+        Modulo.objects.create(nombre='REM', enlace=ENLACE)
+
+        self.assertContains(self.abrir(), '<span class="nuevo">Nuevo</span>', count=1)
+
+    def test_el_buscador_revisa_nombre_descripcion_y_categoria(self):
+        registros = Categoria.objects.create(nombre='Registros y gestión', descripcion='Metas')
+        Modulo.objects.create(
+            nombre='REM', descripcion='Registro Estadístico Mensual', categoria=registros, enlace=ENLACE,
+        )
+
+        respuesta = self.abrir()
+
+        self.assertContains(respuesta, 'id="q" type="search"')
+        self.assertContains(respuesta, 'data-buscar="REM Registro Estadístico Mensual Registros y gestión Metas"')
+
+
+class ModulosInicialesTests(TestCase):
+    def test_los_tres_modulos_parten_en_su_categoria(self):
+        esperado = {
+            'Per Cápita Comunal': 'Registros y gestión',
+            'Indicadores IAAPS y REM': 'Registros y gestión',
+            'Rendimientos y Agenda': 'Atención de salud',
+        }
+        for nombre, categoria in esperado.items():
+            with self.subTest(nombre=nombre):
+                self.assertEqual(Modulo.objects.get(nombre=nombre).categoria.nombre, categoria)
 
 
 class ReporteTests(TestCase):

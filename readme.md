@@ -6,7 +6,8 @@ Página con acceso restringido que reúne las herramientas estadísticas de la c
 
 Todo se hace en **Administrar**, con una cuenta de administrador:
 
-- **Agregar una herramienta:** Módulos, "Añadir módulo", con nombre, descripción, enlace `https` y último corte.
+- **Agregar una herramienta:** Módulos, "Añadir módulo", con nombre, descripción, categoría, ícono, enlace `https` y último corte. Marcar "Nuevo" muestra esa etiqueta en la tarjeta.
+- **Agrupar en secciones:** Categorías, "Añadir categoría", con nombre, descripción, color y orden. La portada muestra una sección por categoría con módulos activos; los módulos sin categoría van al final, en "Otras herramientas". El buscador de la portada filtra por nombre, descripción y categoría.
 - **Actualizar un corte:** se edita directo en la lista de módulos.
 - **Publicar un reporte mensual (IAAPS, REM u otro):** Reportes, "Añadir reporte", con módulo, título, año, mes y el archivo PDF o XLSX (hasta 10 MB). En la portada, un módulo sin enlace y con reportes muestra "Ver reportes", y su corte pasa a ser el período del reporte más reciente (por ejemplo, Noviembre 2026). Los archivos solo se descargan con sesión. No subir archivos con RUT, nombres ni otros datos de personas.
 - **Dar acceso a una persona:** Usuarios, "Añadir usuario". Con una cuenta común solo ve la portada; no marcar "Es staff" salvo que deba administrar.
