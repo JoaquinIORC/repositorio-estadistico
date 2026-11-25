@@ -5,13 +5,17 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils.text import slugify
 
-from .models import Modulo, Reporte
+from .models import Categoria, Modulo, Reporte
 
 
 @login_required
 def inicio(request):
     """Portada de las herramientas, con el último corte de cada una."""
-    modulos = list(Modulo.objects.filter(activo=True).prefetch_related('reportes'))
+    modulos = list(
+        Modulo.objects.filter(activo=True)
+        .select_related('categoria')
+        .prefetch_related('reportes')
+    )
 
     for modulo in modulos:
         # Los reportes vienen del más reciente al más antiguo (Meta.ordering).
@@ -21,8 +25,17 @@ def inicio(request):
             # Con reportes cargados, el corte es el período del más reciente.
             modulo.corte = reportes[0].periodo
 
+    # Una sección por categoría con módulos, en su orden; los sin categoría van al final.
+    secciones = [
+        {'categoria': categoria, 'modulos': [m for m in modulos if m.categoria_id == categoria.id]}
+        for categoria in Categoria.objects.all()
+    ]
+    secciones.append({'categoria': None, 'modulos': [m for m in modulos if m.categoria_id is None]})
+
     return render(request, 'inicio.html', {
         'modulos': modulos,
+        'secciones': [seccion for seccion in secciones if seccion['modulos']],
+        'hay_categorias': any(m.categoria_id for m in modulos),
         'con_corte': [
             modulo for modulo in modulos
             if modulo.enlace or modulo.corte

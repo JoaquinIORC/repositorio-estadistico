@@ -89,11 +89,71 @@ def ruta_reporte_privado(instance, filename):
     return f'reportes/{instance.modulo_id}/{uuid.uuid4().hex}{extension}'
 
 
+COLORES = (
+    ('azul', 'Azul'),
+    ('verde', 'Verde'),
+    ('morado', 'Morado'),
+    ('naranja', 'Naranja'),
+)
+
+# Cada valor corresponde a un símbolo de templates/iconos.html.
+ICONOS = (
+    ('grafico', 'Gráfico'),
+    ('documento', 'Documento'),
+    ('lista', 'Lista'),
+    ('bandera', 'Bandera (metas)'),
+    ('personas', 'Personas'),
+    ('escritorio', 'Escritorio (agenda)'),
+    ('pulso', 'Pulso (urgencia)'),
+    ('hospital', 'Hospital'),
+    ('vacuna', 'Vacuna'),
+    ('invierno', 'Copo de nieve (invierno)'),
+    ('mapa', 'Mapa'),
+    ('escudo', 'Escudo (garantías)'),
+)
+
+
+class Categoria(models.Model):
+    """Agrupa los módulos de la portada en secciones."""
+
+    nombre = models.CharField(max_length=60, unique=True)
+    descripcion = models.CharField(
+        'descripción', max_length=150, blank=True,
+        help_text='Una línea bajo el título de la sección.',
+    )
+    color = models.CharField(
+        max_length=10, choices=COLORES, default='azul',
+        help_text='Color de los íconos de sus módulos.',
+    )
+    orden = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['orden', 'nombre']
+        verbose_name = 'categoría'
+        verbose_name_plural = 'categorías'
+
+    def __str__(self):
+        return self.nombre
+
+
 class Modulo(models.Model):
     """Una herramienta del repositorio. Se agregan desde el panel."""
 
     nombre = models.CharField(max_length=80, unique=True)
     descripcion = models.CharField('descripción', max_length=200, blank=True)
+    categoria = models.ForeignKey(
+        Categoria,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modulos',
+        verbose_name='categoría',
+        help_text='Sin categoría, aparece al final, en "Otras herramientas".',
+    )
+    icono = models.CharField('ícono', max_length=12, choices=ICONOS, default='grafico')
+    nuevo = models.BooleanField(
+        default=False, help_text='Muestra la etiqueta "Nuevo" en la portada.',
+    )
     enlace = models.URLField(
         max_length=500,
         blank=True,

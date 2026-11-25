@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 
 {% block contenido %}
+{% include 'iconos.html' %}
+
 <div class="portada">
     <h1>Información disponible</h1>
-    <p class="intro">Herramientas estadísticas de la comuna. Elija una para abrir sus informes y tableros.</p>
+    <p class="intro">Herramientas estadísticas de la comuna. Elija una para abrir sus informes y tableros, o búsquela por nombre.</p>
 </div>
 
 <div class="sello" role="note">
@@ -20,40 +22,55 @@
 </div>
 
 {% if modulos %}
-<ul class="grid" role="list">
-    {% for modulo in modulos %}
-    <li>
-        {% if modulo.enlace %}
-        <a class="card" href="{{ modulo.enlace }}" target="_blank" rel="noopener noreferrer">
-            <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
-            <span class="texto">
-                <b>{{ modulo.nombre }}</b>
-                {% if modulo.descripcion %}<small>{{ modulo.descripcion }}</small>{% endif %}
-                <span class="accion">Abrir <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg><span class="oculto"> (se abre en otra pestaña)</span></span>
-            </span>
-        </a>
-        {% elif modulo.tiene_reportes %}
-        <a class="card" href="{% url 'lista_reportes' modulo.id %}">
-            <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
-            <span class="texto">
-                <b>{{ modulo.nombre }}</b>
-                {% if modulo.descripcion %}<small>{{ modulo.descripcion }}</small>{% endif %}
-                <span class="accion">Ver reportes <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
-            </span>
-        </a>
-        {% else %}
-        <div class="card pendiente">
-            <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-            <span class="texto">
-                <b>{{ modulo.nombre }}</b>
-                {% if modulo.descripcion %}<small>{{ modulo.descripcion }}</small>{% endif %}
-                <span class="estado">En preparación</span>
-            </span>
-        </div>
-        {% endif %}
-    </li>
-    {% endfor %}
-</ul>
+{# Sin JavaScript el buscador no funciona: queda oculto y se ven todas las secciones. #}
+<div class="buscar" id="buscador" role="search" hidden>
+    <label for="q" class="oculto">Buscar una herramienta</label>
+    <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+    <input id="q" type="search" placeholder="Buscar, por ejemplo: REM" autocomplete="off">
+</div>
+<p class="oculto" id="resultado" aria-live="polite"></p>
+
+{% for seccion in secciones %}
+<section class="seccion"{% if hay_categorias %} aria-labelledby="seccion-{{ forloop.counter }}"{% endif %}>
+    {% if hay_categorias %}
+    <h2 id="seccion-{{ forloop.counter }}">{% if seccion.categoria %}{{ seccion.categoria.nombre }}{% else %}Otras herramientas{% endif %}</h2>
+    {% if seccion.categoria.descripcion %}<p class="seccion-intro">{{ seccion.categoria.descripcion }}</p>{% endif %}
+    {% endif %}
+    <ul class="grid" role="list">
+        {% for modulo in seccion.modulos %}{% include 'tarjeta.html' %}{% endfor %}
+    </ul>
+</section>
+{% endfor %}
+
+<p class="sin-resultados" id="sin-resultados" hidden>No hay herramientas con esa palabra. Pruebe con otra o borre la búsqueda.</p>
+
+<script>
+// Filtra las tarjetas mientras se escribe; no distingue mayúsculas ni tildes.
+(() => {
+    const caja = document.getElementById('buscador');
+    const q = document.getElementById('q');
+    const resultado = document.getElementById('resultado');
+    const vacio = document.getElementById('sin-resultados');
+    const tarjetas = [...document.querySelectorAll('[data-buscar]')];
+    const secciones = [...document.querySelectorAll('.seccion')];
+    const normalizar = (texto) => texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    tarjetas.forEach((t) => { t.dataset.buscar = normalizar(t.dataset.buscar); });
+
+    caja.hidden = false;
+    q.addEventListener('input', () => {
+        const termino = normalizar(q.value.trim());
+        let visibles = 0;
+        tarjetas.forEach((t) => {
+            const coincide = !termino || t.dataset.buscar.includes(termino);
+            t.hidden = !coincide;
+            if (coincide) visibles++;
+        });
+        secciones.forEach((s) => { s.hidden = !s.querySelector('[data-buscar]:not([hidden])'); });
+        vacio.hidden = visibles > 0;
+        resultado.textContent = termino ? (visibles === 1 ? '1 herramienta encontrada.' : `${visibles} herramientas encontradas.`) : '';
+    });
+})();
+</script>
 {% else %}
 <p class="intro">Todavía no hay herramientas publicadas.</p>
 {% endif %}

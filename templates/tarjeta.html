@@ -1,0 +1,24 @@
+{# Una tarjeta de la portada. data-buscar es el texto que revisa el buscador. #}
+<li data-buscar="{{ modulo.nombre }} {{ modulo.descripcion }} {{ modulo.categoria.nombre|default:'' }} {{ modulo.categoria.descripcion|default:'' }}">
+    {% if modulo.enlace %}
+    <a class="card color-{{ modulo.categoria.color|default:'azul' }}" href="{{ modulo.enlace }}" target="_blank" rel="noopener noreferrer">
+    {% elif modulo.tiene_reportes %}
+    <a class="card color-{{ modulo.categoria.color|default:'azul' }}" href="{% url 'lista_reportes' modulo.id %}">
+    {% else %}
+    <div class="card pendiente">
+    {% endif %}
+        {% if modulo.nuevo %}<span class="nuevo">Nuevo</span>{% endif %}
+        <span class="ico" aria-hidden="true"><svg><use href="#i-{% if modulo.enlace or modulo.tiene_reportes %}{{ modulo.icono }}{% else %}reloj{% endif %}"/></svg></span>
+        <span class="texto">
+            <b>{{ modulo.nombre }}</b>
+            {% if modulo.descripcion %}<small>{{ modulo.descripcion }}</small>{% endif %}
+            {% if modulo.enlace %}
+            <span class="accion">Abrir <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg><span class="oculto"> (se abre en otra pestaña)</span></span>
+            {% elif modulo.tiene_reportes %}
+            <span class="accion">Ver reportes <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+            {% else %}
+            <span class="estado">En preparación</span>
+            {% endif %}
+        </span>
+    {% if modulo.enlace or modulo.tiene_reportes %}</a>{% else %}</div>{% endif %}
+</li>
