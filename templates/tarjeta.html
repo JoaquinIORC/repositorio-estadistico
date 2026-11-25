@@ -1,7 +1,7 @@
 {# Una tarjeta de la portada. data-buscar es el texto que revisa el buscador. #}
 <li data-buscar="{{ modulo.nombre }} {{ modulo.descripcion }} {{ modulo.categoria.nombre|default:'' }} {{ modulo.categoria.descripcion|default:'' }}">
     {% if modulo.enlace %}
-    <a class="card color-{{ modulo.categoria.color|default:'azul' }}" href="{{ modulo.enlace }}" target="_blank" rel="noopener noreferrer">
+    <a class="card color-{{ modulo.categoria.color|default:'azul' }}" href="{% url 'abrir_modulo' modulo.id %}" target="_blank" rel="noopener noreferrer">
     {% elif modulo.tiene_reportes %}
     <a class="card color-{{ modulo.categoria.color|default:'azul' }}" href="{% url 'lista_reportes' modulo.id %}">
     {% else %}

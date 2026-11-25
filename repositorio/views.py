@@ -2,10 +2,10 @@ from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 
-from .models import Categoria, Modulo, Reporte
+from .models import Acceso, Categoria, Modulo, Reporte
 
 
 def modulos_visibles(usuario):
@@ -49,10 +49,23 @@ def inicio(request):
 
 
 @login_required
+def abrir_modulo(request, modulo_id):
+    """Anota el acceso y lleva al enlace externo del módulo."""
+    # Mismas reglas que la portada: sin acceso o sin enlace, 404.
+    modulo = get_object_or_404(
+        modulos_visibles(request.user).exclude(enlace=''), id=modulo_id,
+    )
+    Acceso.anotar(request.user, Acceso.ABRIR, modulo, modulo.nombre)
+    # El enlace solo se guarda desde el panel y se valida como https.
+    return redirect(modulo.enlace)
+
+
+@login_required
 def lista_reportes(request, modulo_id):
     """Lista los archivos disponibles de un módulo."""
     # 404 también si no tiene acceso: no confirma que el módulo existe.
     modulo = get_object_or_404(modulos_visibles(request.user), id=modulo_id)
+    Acceso.anotar(request.user, Acceso.REPORTES, modulo, modulo.nombre)
 
     return render(request, 'reportes/lista.html', {
         'modulo': modulo,
@@ -72,6 +85,11 @@ def descargar_reporte(request, reporte_id):
         archivo = reporte.archivo.open('rb')
     except (FileNotFoundError, OSError):
         raise Http404('El archivo del reporte no está disponible.')
+
+    Acceso.anotar(
+        request.user, Acceso.DESCARGA, reporte.modulo,
+        f'{reporte.modulo.nombre}: {reporte.titulo} ({reporte.periodo})',
+    )
 
     extension = Path(reporte.archivo.name).suffix.lower()
     nombre_base = slugify(reporte.titulo) or 'reporte'

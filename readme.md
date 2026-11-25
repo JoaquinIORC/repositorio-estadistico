@@ -13,6 +13,14 @@ Todo se hace en **Administrar**, con una cuenta de administrador:
 - **Dar acceso a una persona:** Usuarios, "Añadir usuario". Con una cuenta común solo ve la portada; no marcar "Es staff" salvo que deba administrar.
 - **Restringir un módulo a un equipo:** crear el grupo en Grupos (solo el nombre; los permisos de la lista no hacen falta), agregar a las personas en su ficha de usuario, y elegir el grupo en "Grupos" del módulo. Un módulo sin grupos lo ven todos; con grupos, solo sus miembros y los superusuarios. La restricción vale también para sus reportes, aunque se tenga el enlace directo. La columna "Acceso" de la lista de módulos muestra quién ve cada uno.
 
+**Registro de accesos:** en Administrar > Accesos registrados se ve quién abrió cada módulo, quién vio la lista de reportes y quién descargó cada reporte, y cuándo. Se filtra por tipo, módulo y fecha, y se busca por usuario. Nadie puede crear ni editar registros, y solo un superusuario los puede borrar. Para que la tabla no crezca sin límite, borrar los de más de un año:
+
+```bash
+.venv/bin/python manage.py borrar_accesos_antiguos --dias 365
+```
+
+Las tarjetas con enlace pasan por `/modulos/<id>/abrir/`, que anota el acceso y lleva al enlace. Lo que la persona haga después dentro de Per Cápita o Power BI queda en los registros de esas herramientas, no aquí.
+
 Cada herramienta mantiene su propio control de acceso. Per Cápita pide su ingreso, y un Power BI debe estar compartido con cuentas institucionales: un enlace "Publicar en la web" (`view?r=`) lo puede abrir cualquiera que lo tenga.
 
 ## Desarrollo
@@ -35,6 +43,16 @@ Completar `DJANGO_SECRET_KEY` en `.env` y luego:
 ```
 
 Con `DJANGO_DEBUG=True` también se aceptan enlaces `http://localhost`, para conectar el percapitados local. En el servidor se exige siempre `https`.
+
+### Datos de ejemplo para una demostración
+
+```powershell
+.\.venv\Scripts\python manage.py cargar_demo
+```
+
+Carga las categorías y los módulos del ejemplo de Cristian, completa los tres módulos pedidos (Per Cápita restringido al grupo "Equipo Per Cápita", Rendimientos "En preparación" e IAAPS y REM con reportes de septiembre a noviembre) y crea dos cuentas comunes: `demo-equipo`, que ve Per Cápita, y `demo-general`, que no. Las claves se muestran al terminar y cambian cada vez que se corre. Los enlaces de ejemplo van a `example.org` y los reportes dicen que sus datos no son reales.
+
+Se puede correr varias veces: no duplica nada ni cambia lo que ya tiene contenido. Solo funciona con `DJANGO_DEBUG=True`, así que no se puede cargar en el servidor. Para partir de cero, borrar `db.sqlite3` y la carpeta `media/`, y volver a correr `migrate`.
 
 ### Si la instalación falla
 
@@ -66,6 +84,10 @@ chmod 600 .env
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py collectstatic --noinput
 .venv/bin/python manage.py createsuperuser
+# La carpeta de inicio queda abierta (755) para que Nginx lea staticfiles/;
+# la base y los reportes, no.
+chmod 600 db.sqlite3
+mkdir -p media && chmod 700 media
 exit
 ```
 
@@ -133,6 +155,17 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # El panel tiene su propio ingreso: mismo límite de intentos.
+    location = /admin/login/ {
+        limit_req zone=ingreso_repositorio burst=10 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:8002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8002;
         proxy_set_header Host $host;
@@ -147,4 +180,41 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-La base es el archivo `db.sqlite3` y los reportes subidos quedan en la carpeta `media/`: incluir ambos en los respaldos del servidor.
+`manage.py check --deploy` no debe mostrar avisos. Los de HSTS (W004) y redirección a HTTPS (W008) están silenciados en `config/settings.py` porque los resuelve esta configuración de Nginx.
+
+### Actualizar a una versión nueva
+
+```bash
+sudo -u repositorio -i
+cd repositorio-estadistico
+git pull
+.venv/bin/pip install -r requirements.txt gunicorn==26.2.0
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py collectstatic --noinput
+.venv/bin/python manage.py check --deploy
+exit
+sudo systemctl restart repositorio
+```
+
+Antes de `migrate`, respaldar como se indica abajo: algunas versiones agregan tablas (categorías, grupos por módulo, registro de accesos).
+
+### Respaldos
+
+La base es el archivo `db.sqlite3` y los reportes subidos quedan en la carpeta `media/`: incluir ambos en los respaldos del servidor. Copiar `db.sqlite3` mientras el sistema funciona puede dejar una copia a medias; esto saca una copia consistente:
+
+```bash
+sudo -u repositorio -i
+cd repositorio-estadistico
+mkdir -p ~/respaldos && chmod 700 ~/respaldos
+.venv/bin/python -c "import sqlite3; o = sqlite3.connect('db.sqlite3'); d = sqlite3.connect('/srv/repositorio/respaldos/db-$(date +%F).sqlite3'); o.backup(d); d.close()"
+tar czf ~/respaldos/media-$(date +%F).tar.gz media
+```
+
+La carpeta `respaldos` queda solo para el usuario `repositorio`, igual que `db.sqlite3` y `media/`: los reportes y el registro de accesos no deben quedar a la vista de otras cuentas del servidor. Si el sistema ya estaba instalado antes de este cambio, aplicar los permisos una vez:
+
+```bash
+sudo -u repositorio -i
+cd repositorio-estadistico
+chmod 600 db.sqlite3
+mkdir -p media && chmod -R go-rwx media
+```

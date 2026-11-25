@@ -1,7 +1,28 @@
 
 from django.contrib import admin
 
-from .models import Categoria, Modulo, Reporte
+from .models import Acceso, Categoria, Modulo, Reporte
+
+
+@admin.register(Acceso)
+class AccesoAdmin(admin.ModelAdmin):
+    """Solo consulta: los registros los escribe el sistema y nadie los edita."""
+
+    list_display = ('fecha', 'nombre_usuario', 'tipo', 'detalle')
+    list_filter = ('tipo', 'modulo', 'fecha')
+    search_fields = ('nombre_usuario', 'detalle')
+    date_hierarchy = 'fecha'
+    list_per_page = 100
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Borrar queda para un superusuario, por ejemplo al limpiar registros antiguos.
+        return request.user.is_superuser
 
 
 @admin.register(Categoria)

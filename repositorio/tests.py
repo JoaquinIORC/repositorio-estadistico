@@ -1,5 +1,8 @@
 
+import re
 import tempfile
+from datetime import timedelta
+from io import StringIO
 from pathlib import Path
 
 from django.conf import settings
@@ -7,10 +10,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
-from .models import Categoria, Modulo, Reporte, validar_archivo_reporte
+from .models import Acceso, Categoria, Modulo, Reporte, validar_archivo_reporte
 
 ENLACE = 'https://app.powerbi.com/groups/me/reports/abc'
 
@@ -69,6 +74,10 @@ class AccesoTests(TestCase):
             self.client.get('/admin/repositorio/modulo/').status_code, 302
         )
 
+    def test_los_reportes_subidos_no_los_leen_otras_cuentas(self):
+        self.assertEqual(settings.FILE_UPLOAD_PERMISSIONS, 0o600)
+        self.assertEqual(settings.FILE_UPLOAD_DIRECTORY_PERMISSIONS, 0o700)
+
     def test_sus_cookies_no_chocan_con_las_de_percapitados(self):
         self.assertNotEqual(settings.SESSION_COOKIE_NAME, 'sessionid')
         self.assertNotEqual(settings.CSRF_COOKIE_NAME, 'csrftoken')
@@ -102,10 +111,12 @@ class PortadaTests(TestCase):
         )
         respuesta = self.abrir()
 
+        modulo = Modulo.objects.get(nombre='Tablero nuevo')
         self.assertContains(respuesta, 'Tablero nuevo: Semana 47')
+        # La tarjeta pasa por el registro de accesos, que lleva al enlace.
         self.assertContains(
             respuesta,
-            f'href="{ENLACE}" target="_blank" rel="noopener noreferrer"',
+            f'href="{reverse("abrir_modulo", args=[modulo.id])}" target="_blank" rel="noopener noreferrer"',
         )
 
     def test_el_sello_dice_si_falta_el_corte(self):
@@ -310,6 +321,175 @@ class AccesoPorGrupoTests(TestCase):
             self.assertEqual(respuesta.status_code, 200)
         finally:
             respuesta.close()
+
+
+class RegistroDeAccesosTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.directorio_media = tempfile.TemporaryDirectory()
+        cls.override_media = override_settings(MEDIA_ROOT=Path(cls.directorio_media.name))
+        cls.override_media.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.override_media.disable()
+        cls.directorio_media.cleanup()
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        cls.con_enlace = Modulo.objects.create(nombre='Tablero', enlace=ENLACE)
+        cls.con_reportes = Modulo.objects.create(nombre='Informes')
+        cls.reporte = Reporte.objects.create(
+            modulo=cls.con_reportes, titulo='IAAPS', anio=2026, mes=11, subido_por=cls.usuario,
+            archivo=SimpleUploadedFile('r.pdf', b'%PDF-1.4 prueba', content_type='application/pdf'),
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def test_abrir_anota_y_lleva_al_enlace(self):
+        respuesta = self.client.get(reverse('abrir_modulo', args=[self.con_enlace.id]))
+
+        self.assertRedirects(respuesta, ENLACE, fetch_redirect_response=False)
+        acceso = Acceso.objects.get()
+        self.assertEqual(
+            (acceso.usuario, acceso.nombre_usuario, acceso.tipo, acceso.modulo, acceso.detalle),
+            (self.usuario, 'ana', Acceso.ABRIR, self.con_enlace, 'Tablero'),
+        )
+
+    def test_la_lista_y_la_descarga_se_anotan(self):
+        self.client.get(reverse('lista_reportes', args=[self.con_reportes.id]))
+        self.client.get(reverse('descargar_reporte', args=[self.reporte.id])).close()
+
+        self.assertEqual(
+            list(Acceso.objects.order_by('fecha', 'id').values_list('tipo', 'detalle')),
+            [(Acceso.REPORTES, 'Informes'), (Acceso.DESCARGA, 'Informes: IAAPS (Noviembre 2026)')],
+        )
+
+    def test_sin_acceso_no_redirige_ni_anota(self):
+        equipo = Group.objects.create(name='Equipo')
+        self.con_enlace.grupos.add(equipo)
+
+        respuesta = self.client.get(reverse('abrir_modulo', args=[self.con_enlace.id]))
+
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertFalse(Acceso.objects.exists())
+
+    def test_un_modulo_sin_enlace_no_se_abre(self):
+        respuesta = self.client.get(reverse('abrir_modulo', args=[self.con_reportes.id]))
+
+        self.assertEqual(respuesta.status_code, 404)
+
+    def test_sin_sesion_pide_ingresar(self):
+        self.client.logout()
+
+        respuesta = self.client.get(reverse('abrir_modulo', args=[self.con_enlace.id]))
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('login'), respuesta['Location'])
+        self.assertFalse(Acceso.objects.exists())
+
+    def test_el_registro_sobrevive_si_se_borra_la_cuenta(self):
+        otro = get_user_model().objects.create_user('temporal')
+        Acceso.anotar(otro, Acceso.ABRIR, self.con_enlace, 'Tablero')
+
+        otro.delete()
+
+        acceso = Acceso.objects.get()
+        self.assertIsNone(acceso.usuario)
+        self.assertEqual(acceso.nombre_usuario, 'temporal')
+
+    def test_en_el_panel_solo_se_consulta(self):
+        admin = get_user_model().objects.create_superuser('jefe')
+        Acceso.anotar(self.usuario, Acceso.ABRIR, self.con_enlace, 'Tablero')
+        self.client.force_login(admin)
+
+        self.assertEqual(self.client.get('/admin/repositorio/acceso/').status_code, 200)
+        self.assertEqual(self.client.get('/admin/repositorio/acceso/add/').status_code, 403)
+
+    def test_borra_solo_los_registros_antiguos(self):
+        antiguo = Acceso.anotar(self.usuario, Acceso.ABRIR, self.con_enlace, 'Tablero')
+        Acceso.objects.filter(id=antiguo.id).update(fecha=timezone.now() - timedelta(days=400))
+        Acceso.anotar(self.usuario, Acceso.ABRIR, self.con_enlace, 'Tablero')
+
+        call_command('borrar_accesos_antiguos', dias=365, stdout=StringIO())
+
+        self.assertEqual(Acceso.objects.count(), 1)
+        self.assertFalse(Acceso.objects.filter(id=antiguo.id).exists())
+
+    def test_no_borra_con_un_plazo_muy_corto(self):
+        with self.assertRaises(CommandError):
+            call_command('borrar_accesos_antiguos', dias=1, stdout=StringIO())
+
+
+class CargarDemoTests(TestCase):
+    def setUp(self):
+        self.directorio_temporal = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directorio_temporal.cleanup)
+        self.override_media = override_settings(MEDIA_ROOT=Path(self.directorio_temporal.name))
+        self.override_media.enable()
+        self.addCleanup(self.override_media.disable)
+
+    def cargar(self, **opciones):
+        call_command('cargar_demo', stdout=StringIO(), **opciones)
+
+    def test_no_corre_fuera_de_desarrollo(self):
+        with self.assertRaises(CommandError):
+            self.cargar()
+        self.assertFalse(Modulo.objects.filter(nombre='COMGES').exists())
+
+    @override_settings(DEBUG=True)
+    def test_carga_la_demo_sin_duplicar(self):
+        self.cargar()
+        self.cargar()
+
+        self.assertEqual(Modulo.objects.filter(nombre='COMGES').count(), 1)
+        self.assertEqual(Categoria.objects.filter(nombre='Territorio').count(), 1)
+        self.assertEqual(Reporte.objects.count(), 6)
+        per_capita = Modulo.objects.get(nombre='Per Cápita Comunal')
+        self.assertTrue(per_capita.grupos.filter(name='Equipo Per Cápita').exists())
+        self.assertEqual(Modulo.objects.get(nombre='Rendimientos y Agenda').enlace, '')
+
+    @override_settings(DEBUG=True)
+    def test_no_pisa_lo_que_ya_tiene_contenido(self):
+        Modulo.objects.filter(nombre='Per Cápita Comunal').update(
+            enlace='https://percapita.ejemplo.cl/', corte='Octubre 2026',
+        )
+
+        self.cargar(sin_usuarios=True)
+
+        per_capita = Modulo.objects.get(nombre='Per Cápita Comunal')
+        self.assertEqual(per_capita.enlace, 'https://percapita.ejemplo.cl/')
+        self.assertEqual(per_capita.corte, 'Octubre 2026')
+
+    @override_settings(DEBUG=True)
+    def test_los_reportes_de_ejemplo_son_pdf_validos(self):
+        self.cargar(sin_usuarios=True)
+
+        for reporte in Reporte.objects.all():
+            with self.subTest(reporte=str(reporte)), reporte.archivo.open('rb') as archivo:
+                validar_archivo_reporte(archivo)
+                pdf = archivo.read()
+                self.assertTrue(pdf.rstrip().endswith(b'%%EOF'))
+                # Los lectores de PDF usan este índice: cada posición debe apuntar a su objeto.
+                inicio_xref = int(re.search(rb'startxref\n(\d+)', pdf).group(1))
+                self.assertEqual(pdf[inicio_xref:inicio_xref + 4], b'xref')
+                posiciones = [int(p) for p in re.findall(rb'(\d{10}) 00000 n', pdf)]
+                for numero, posicion in enumerate(posiciones, start=1):
+                    self.assertTrue(pdf[posicion:].startswith(b'%d 0 obj' % numero))
+
+    @override_settings(DEBUG=True)
+    def test_crea_las_cuentas_de_ejemplo(self):
+        self.cargar()
+
+        equipo = get_user_model().objects.get(username='demo-equipo')
+        general = get_user_model().objects.get(username='demo-general')
+        self.assertTrue(equipo.groups.filter(name='Equipo Per Cápita').exists())
+        self.assertFalse(general.groups.exists())
+        self.assertFalse(equipo.is_staff or general.is_staff)
 
 
 class ModulosInicialesTests(TestCase):
