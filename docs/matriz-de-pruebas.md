@@ -221,3 +221,37 @@ Se repitieron los casos de la primera pasada que dependen de la portada, más R-
 ### Recomendación de la segunda pasada
 
 Se puede unir el PR #9 y mostrar a Cristian el portal completo con `cargar_demo`. Rendimientos se muestra solo después de que P-01 esté aprobado. Antes de usarlo con datos reales: instalar en el servidor y correr SV-01 a SV-04 y R-08, probar R-01 y R-02 con los reportes de Daniel, y O-03 en el computador de la demostración.
+
+## Pruebas de seguridad: 25-11-2026
+
+- **Versión probada:** `fix/seguridad` (`03c6413`), sobre `main` (`f2018ae`).
+- **Ejecutó:** Joaquín Orellana.
+- **Entorno:** el de la segunda pasada, con `DJANGO_DEBUG=False` y HTTPS simulado como detrás de Nginx. Además: revisión del código y del historial de git, y `pip-audit` sobre `requirements.txt` y Gunicorn (sin vulnerabilidades conocidas).
+- **Resultado:** 17 de 17 aprobados. En la primera corrida sobre `main` fallaron SEG-07 (la aplicación no limitaba intentos), SEG-12 (sin `no-store`) y SEG-13 (sin CSP); los tres se corrigieron en esta rama.
+
+| ID | Caso | Pasos | Esperado | Estado | Evidencia |
+|---|---|---|---|---|---|
+| SEG-01 | Sin sesión | Pedir portada, módulos, abrir, descargas y panel sin ingresar | Todas llevan al ingreso | Aprobado | Cliente |
+| SEG-02 | CSRF | Ingresar y cerrar sesión sin token; cerrar sesión por GET | 403, 403 y 405 | Aprobado | Cliente |
+| SEG-03 | Redirección abierta | `?next=` hacia `https://malo.cl/`, `//malo.cl/`, `/\malo.cl/` y `javascript:` | Siempre queda en el portal | Aprobado | Cliente |
+| SEG-04 | Fijación de sesión | Comparar el identificador de sesión antes y después de ingresar | Cambia | Aprobado | Cliente |
+| SEG-05 | Cookies | Ingresar por HTTPS | Secure, HttpOnly, SameSite=Lax, 30 minutos | Aprobado | Cliente |
+| SEG-06 | Enumeración de cuentas | Clave mala con una cuenta que existe y con una que no | Mismo mensaje | Aprobado | Cliente |
+| SEG-07 | Fuerza bruta | 30 claves malas seguidas y luego la correcta; otra cuenta desde el mismo equipo | Bloqueada; la otra cuenta entra | Aprobado | Cliente |
+| SEG-08 | XSS almacenado | HTML y `<script>` en nombres, descripciones, cortes y títulos | Escapado en portada, reportes y panel | Aprobado | Cliente |
+| SEG-09 | Encabezado de descarga | Título de reporte con comillas y saltos de línea | Nombre de archivo limpio | Aprobado | Cliente |
+| SEG-10 | Subidas maliciosas | `../../`, `.pdf.html`, xlsx falso y HTML que empieza con `%PDF-` | Rechazados, o guardados con nombre aleatorio y entregados solo como descarga con `nosniff` | Aprobado | Cliente |
+| SEG-11 | Cabeceras | Revisar la respuesta de la portada | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` y `Cross-Origin-Opener-Policy` | Aprobado | Cliente |
+| SEG-12 | Caché | Revisar portada y descarga de reporte | `Cache-Control: no-store, private` | Aprobado | Cliente |
+| SEG-13 | Política de contenido | Revisar portada, ingreso y panel, y la consola del navegador | CSP con `script-src 'self'` y sin errores en la consola | Aprobado | Cliente y navegador |
+| SEG-14 | Errores y Host | Dirección inexistente y encabezado Host falso | Sin detalles técnicos; 400 | Aprobado | Cliente |
+| SEG-15 | Personal sin permisos | Staff sin permisos en reportes, usuarios y accesos | 403 | Aprobado | Cliente |
+| SEG-16 | Claves débiles | Crear una cuenta con clave "12345678" | Rechazada | Aprobado | Cliente |
+| SEG-17 | Reportes de otro grupo | Probar cada número de reporte de un módulo restringido | 404 | Aprobado | Cliente |
+
+### Seguridad en el servidor: por probar
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| SV-05 | Bloqueo con la IP real | Desde dos computadores de la red, fallar 5 veces con una cuenta en el primero y entrar con ella en el segundo | Bloqueada en el primero, entra en el segundo (Nginx informa la IP de cada uno) | | Por probar | |
+| SV-06 | Cabeceras por HTTPS | `curl -sI https://<servidor>/ingresar/` | CSP, `no-store`, `Strict-Transport-Security` y `X-Frame-Options` | | Por probar | |
