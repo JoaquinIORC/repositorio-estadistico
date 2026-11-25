@@ -258,3 +258,51 @@ class Reporte(models.Model):
     def periodo(self):
         """Mes y año en palabras, como lo muestra el sello: Noviembre 2026."""
         return f'{MESES[self.mes - 1]} {self.anio}'
+
+
+class Acceso(models.Model):
+    """Quién abrió qué y cuándo. Lo escribe el sistema; en el panel solo se consulta."""
+
+    ABRIR = 'abrir'
+    REPORTES = 'reportes'
+    DESCARGA = 'descarga'
+    TIPOS = (
+        (ABRIR, 'Abrió el enlace'),
+        (REPORTES, 'Vio la lista de reportes'),
+        (DESCARGA, 'Descargó un reporte'),
+    )
+
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='accesos',
+    )
+    # Los nombres se copian como texto: el registro se mantiene aunque después
+    # se borre o renombre la cuenta, el módulo o el reporte.
+    nombre_usuario = models.CharField('usuario', max_length=150)
+    tipo = models.CharField(max_length=10, choices=TIPOS)
+    modulo = models.ForeignKey(
+        Modulo, on_delete=models.SET_NULL, null=True, related_name='accesos',
+        verbose_name='módulo',
+    )
+    detalle = models.CharField(max_length=250)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = 'acceso'
+        verbose_name_plural = 'registro de accesos'
+
+    def __str__(self):
+        return f'{self.nombre_usuario}: {self.get_tipo_display()} ({self.detalle})'
+
+    @classmethod
+    def anotar(cls, usuario, tipo, modulo, detalle):
+        return cls.objects.create(
+            usuario=usuario,
+            nombre_usuario=usuario.get_username(),
+            tipo=tipo,
+            modulo=modulo,
+            detalle=detalle[:250],
+        )

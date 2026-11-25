@@ -95,6 +95,7 @@ Cambios desde la primera pasada, en estas ramas:
 - `feature/buscador-categorias`: secciones por categoría, buscador, íconos y etiqueta "Nuevo".
 - `fix/observaciones-pruebas`: observaciones de la primera pasada.
 - `feature/acceso-por-grupo`: módulos visibles solo para ciertos grupos de usuarios.
+- `feature/demo-registro-produccion`: datos de ejemplo (`cargar_demo`), registro de accesos y ajustes para el servidor.
 
 Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque la portada cambió. R-01 a R-04 y P-01 siguen pendientes.
 
@@ -131,6 +132,15 @@ Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque l
 | G-04 | Enlace directo | Sin ser del grupo, abrir `/modulos/<id>/` y el enlace de descarga de uno de sus reportes | Página no encontrada en ambos | | Por probar | |
 | G-05 | Superusuario | Ingresar con un superusuario | Ve todos los módulos | | Por probar | |
 | G-06 | Columna "Acceso" | Abrir Administrar > Módulos | "Todos" o el nombre de los grupos | | Por probar | |
+
+### Registro de accesos (`feature/demo-registro-produccion`)
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| L-01 | Abrir un módulo | Hacer clic en una tarjeta con enlace | Se abre el enlace en otra pestaña y queda "Abrió el enlace" en Registro de accesos | | Por probar | |
+| L-02 | Reportes | Ver la lista de reportes y descargar uno | Quedan "Vio la lista de reportes" y "Descargó un reporte", con el período | | Por probar | |
+| L-03 | Solo consulta | En Registro de accesos, buscar "Añadir" o editar un registro | No se puede; un staff sin superusuario tampoco puede borrar | | Por probar | |
+| L-04 | Limpieza | Correr `borrar_accesos_antiguos --dias 365` | Borra solo los de más de un año e informa cuántos | | Por probar | |
 
 ### Observaciones de la primera pasada
 

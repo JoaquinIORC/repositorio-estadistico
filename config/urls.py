@@ -22,6 +22,11 @@ urlpatterns = [
         name='logout',
     ),
     path(
+        'modulos/<int:modulo_id>/abrir/',
+        views.abrir_modulo,
+        name='abrir_modulo',
+    ),
+    path(
         'modulos/<int:modulo_id>/',
         views.lista_reportes,
         name='lista_reportes',
