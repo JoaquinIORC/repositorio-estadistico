@@ -1,5 +1,6 @@
 
 import tempfile
+from io import StringIO
 from pathlib import Path
 
 from django.conf import settings
@@ -7,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -310,6 +312,66 @@ class AccesoPorGrupoTests(TestCase):
             self.assertEqual(respuesta.status_code, 200)
         finally:
             respuesta.close()
+
+
+class CargarDemoTests(TestCase):
+    def setUp(self):
+        self.directorio_temporal = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directorio_temporal.cleanup)
+        self.override_media = override_settings(MEDIA_ROOT=Path(self.directorio_temporal.name))
+        self.override_media.enable()
+        self.addCleanup(self.override_media.disable)
+
+    def cargar(self, **opciones):
+        call_command('cargar_demo', stdout=StringIO(), **opciones)
+
+    def test_no_corre_fuera_de_desarrollo(self):
+        with self.assertRaises(CommandError):
+            self.cargar()
+        self.assertFalse(Modulo.objects.filter(nombre='COMGES').exists())
+
+    @override_settings(DEBUG=True)
+    def test_carga_la_demo_sin_duplicar(self):
+        self.cargar()
+        self.cargar()
+
+        self.assertEqual(Modulo.objects.filter(nombre='COMGES').count(), 1)
+        self.assertEqual(Categoria.objects.filter(nombre='Territorio').count(), 1)
+        self.assertEqual(Reporte.objects.count(), 6)
+        per_capita = Modulo.objects.get(nombre='Per Cápita Comunal')
+        self.assertTrue(per_capita.grupos.filter(name='Equipo Per Cápita').exists())
+        self.assertEqual(Modulo.objects.get(nombre='Rendimientos y Agenda').enlace, '')
+
+    @override_settings(DEBUG=True)
+    def test_no_pisa_lo_que_ya_tiene_contenido(self):
+        Modulo.objects.filter(nombre='Per Cápita Comunal').update(
+            enlace='https://percapita.ejemplo.cl/', corte='Octubre 2026',
+        )
+
+        self.cargar(sin_usuarios=True)
+
+        per_capita = Modulo.objects.get(nombre='Per Cápita Comunal')
+        self.assertEqual(per_capita.enlace, 'https://percapita.ejemplo.cl/')
+        self.assertEqual(per_capita.corte, 'Octubre 2026')
+
+    @override_settings(DEBUG=True)
+    def test_los_reportes_de_ejemplo_son_pdf_validos(self):
+        self.cargar(sin_usuarios=True)
+
+        for reporte in Reporte.objects.all():
+            with self.subTest(reporte=str(reporte)), reporte.archivo.open('rb') as archivo:
+                validar_archivo_reporte(archivo)
+                self.assertTrue(archivo.read().rstrip().endswith(b'%%EOF'))
+
+    @override_settings(DEBUG=True)
+    def test_crea_las_cuentas_de_ejemplo(self):
+        self.cargar()
+
+        equipo = get_user_model().objects.get(username='demo-equipo')
+        general = get_user_model().objects.get(username='demo-general')
+        self.assertTrue(equipo.groups.filter(name='Equipo Per Cápita').exists())
+        self.assertFalse(general.groups.exists())
+        self.assertFalse(equipo.is_staff or general.is_staff)
 
 
 class ModulosInicialesTests(TestCase):

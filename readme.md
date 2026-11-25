@@ -36,6 +36,16 @@ Completar `DJANGO_SECRET_KEY` en `.env` y luego:
 
 Con `DJANGO_DEBUG=True` también se aceptan enlaces `http://localhost`, para conectar el percapitados local. En el servidor se exige siempre `https`.
 
+### Datos de ejemplo para una demostración
+
+```powershell
+.\.venv\Scripts\python manage.py cargar_demo
+```
+
+Carga las categorías y los módulos del ejemplo de Cristian, completa los tres módulos pedidos (Per Cápita restringido al grupo "Equipo Per Cápita", Rendimientos "En preparación" e IAAPS y REM con reportes de septiembre a noviembre) y crea dos cuentas comunes: `demo-equipo`, que ve Per Cápita, y `demo-general`, que no. Las claves se muestran al terminar y cambian cada vez que se corre. Los enlaces de ejemplo van a `example.org` y los reportes dicen que sus datos no son reales.
+
+Se puede correr varias veces: no duplica nada ni cambia lo que ya tiene contenido. Solo funciona con `DJANGO_DEBUG=True`, así que no se puede cargar en el servidor. Para partir de cero, borrar `db.sqlite3` y la carpeta `media/`, y volver a correr `migrate`.
+
 ### Si la instalación falla
 
 - **"Python was not found" o se abre la Microsoft Store:** Python no está instalado o no está en el PATH. Instalarlo desde python.org marcando "Add python.exe to PATH", y abrir una terminal nueva.
