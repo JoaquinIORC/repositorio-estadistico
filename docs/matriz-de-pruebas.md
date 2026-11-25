@@ -96,8 +96,9 @@ Cambios desde la primera pasada, en estas ramas:
 - `fix/observaciones-pruebas`: observaciones de la primera pasada.
 - `feature/acceso-por-grupo`: módulos visibles solo para ciertos grupos de usuarios.
 - `feature/demo-registro-produccion`: datos de ejemplo (`cargar_demo`), registro de accesos y ajustes para el servidor.
+- `fix/centrar-secciones-portada` (PR #9): tarjetas cuadradas con el color de su categoría, secciones y sello centrados.
 
-Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque la portada cambió. R-01 a R-04 y P-01 siguen pendientes.
+Además de estos casos, repetir A-01 a A-07, M-01 a M-07, S-01 a S-04 y D-01 a D-03, porque la portada cambió. R-01 a R-04 y P-01 siguen pendientes.
 
 ### Reportes (complementa R-01 a R-04)
 
@@ -121,6 +122,16 @@ Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque l
 | C-07 | Buscador con lector de pantalla | Buscar con NVDA o Narrador | Anuncia "N herramientas encontradas" | | Por probar | |
 | C-08 | Etiqueta "Nuevo" | Marcar "Nuevo" en un módulo | La tarjeta muestra la etiqueta | | Por probar | |
 | C-09 | Tamaños de pantalla | Ver la portada en 1280, 768 y 375 px | Sin scroll horizontal; secciones y buscador legibles | | Por probar | |
+
+### Diseño de cuadritos (PR #9)
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| D-05 | Cuadritos por fila | Ver la portada en 1280, 768 y 375 px | 4, 3 y 2 tarjetas por fila; con un nombre de 80 caracteres y una descripción de 200, la fila crece y nada se sale | | Por probar | |
+| D-06 | Colores de categoría | Ver una tarjeta de cada color y una "En preparación" | Fondo suave de su color y borde del mismo tono; "En preparación" sigue gris y punteada | | Por probar | |
+| D-07 | Contraste sobre el fondo de color | Medir descripción y "Abrir" en la parte más oscura del fondo, en las cuatro categorías | 4,5:1 o más | | Por probar | |
+| D-08 | Sello con ícono | Ver el sello en la portada y en la lista de reportes | El ícono de calendario aparece en ambos y el lector de pantalla no lo lee | | Por probar | |
+| D-09 | Reducir movimiento | Activar "reducir movimiento" en el sistema y pasar el mouse por una tarjeta | La tarjeta no se mueve | | Por probar | |
 
 ### Acceso por grupo (`feature/acceso-por-grupo`)
 
