@@ -13,7 +13,7 @@ Todo se hace en **Administrar**, con una cuenta de administrador:
 - **Dar acceso a una persona:** Usuarios, "Añadir usuario". Con una cuenta común solo ve la portada; no marcar "Es staff" salvo que deba administrar.
 - **Restringir un módulo a un equipo:** crear el grupo en Grupos (solo el nombre; los permisos de la lista no hacen falta), agregar a las personas en su ficha de usuario, y elegir el grupo en "Grupos" del módulo. Un módulo sin grupos lo ven todos; con grupos, solo sus miembros y los superusuarios. La restricción vale también para sus reportes, aunque se tenga el enlace directo. La columna "Acceso" de la lista de módulos muestra quién ve cada uno.
 
-**Registro de accesos:** en Administrar > Registro de accesos se ve quién abrió cada módulo, quién vio la lista de reportes y quién descargó cada reporte, y cuándo. Se filtra por tipo, módulo y fecha, y se busca por usuario. Nadie puede crear ni editar registros, y solo un superusuario los puede borrar. Para que la tabla no crezca sin límite, borrar los de más de un año:
+**Registro de accesos:** en Administrar > Accesos registrados se ve quién abrió cada módulo, quién vio la lista de reportes y quién descargó cada reporte, y cuándo. Se filtra por tipo, módulo y fecha, y se busca por usuario. Nadie puede crear ni editar registros, y solo un superusuario los puede borrar. Para que la tabla no crezca sin límite, borrar los de más de un año:
 
 ```bash
 .venv/bin/python manage.py borrar_accesos_antiguos --dias 365

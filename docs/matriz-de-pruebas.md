@@ -137,9 +137,9 @@ Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque l
 
 | ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
 |---|---|---|---|---|---|---|
-| L-01 | Abrir un módulo | Hacer clic en una tarjeta con enlace | Se abre el enlace en otra pestaña y queda "Abrió el enlace" en Registro de accesos | | Por probar | |
+| L-01 | Abrir un módulo | Hacer clic en una tarjeta con enlace | Se abre el enlace en otra pestaña y queda "Abrió el enlace" en Accesos registrados | | Por probar | |
 | L-02 | Reportes | Ver la lista de reportes y descargar uno | Quedan "Vio la lista de reportes" y "Descargó un reporte", con el período | | Por probar | |
-| L-03 | Solo consulta | En Registro de accesos, buscar "Añadir" o editar un registro | No se puede; un staff sin superusuario tampoco puede borrar | | Por probar | |
+| L-03 | Solo consulta | En Accesos registrados, buscar "Añadir" o editar un registro | No se puede; un staff sin superusuario tampoco puede borrar | | Por probar | |
 | L-04 | Limpieza | Correr `borrar_accesos_antiguos --dias 365` | Borra solo los de más de un año e informa cuántos | | Por probar | |
 
 ### Servidor (`feature/demo-registro-produccion`)

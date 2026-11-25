@@ -25,8 +25,8 @@ class Migration(migrations.Migration):
                 ('usuario', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='accesos', to=settings.AUTH_USER_MODEL)),
             ],
             options={
-                'verbose_name': 'acceso',
-                'verbose_name_plural': 'registro de accesos',
+                'verbose_name': 'acceso registrado',
+                'verbose_name_plural': 'accesos registrados',
                 'ordering': ['-fecha'],
             },
         ),

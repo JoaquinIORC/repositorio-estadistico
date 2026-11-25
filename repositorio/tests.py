@@ -1,4 +1,5 @@
 
+import re
 import tempfile
 from datetime import timedelta
 from io import StringIO
@@ -471,7 +472,14 @@ class CargarDemoTests(TestCase):
         for reporte in Reporte.objects.all():
             with self.subTest(reporte=str(reporte)), reporte.archivo.open('rb') as archivo:
                 validar_archivo_reporte(archivo)
-                self.assertTrue(archivo.read().rstrip().endswith(b'%%EOF'))
+                pdf = archivo.read()
+                self.assertTrue(pdf.rstrip().endswith(b'%%EOF'))
+                # Los lectores de PDF usan este índice: cada posición debe apuntar a su objeto.
+                inicio_xref = int(re.search(rb'startxref\n(\d+)', pdf).group(1))
+                self.assertEqual(pdf[inicio_xref:inicio_xref + 4], b'xref')
+                posiciones = [int(p) for p in re.findall(rb'(\d{10}) 00000 n', pdf)]
+                for numero, posicion in enumerate(posiciones, start=1):
+                    self.assertTrue(pdf[posicion:].startswith(b'%d 0 obj' % numero))
 
     @override_settings(DEBUG=True)
     def test_crea_las_cuentas_de_ejemplo(self):

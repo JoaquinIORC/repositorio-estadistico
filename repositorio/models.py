@@ -291,8 +291,8 @@ class Acceso(models.Model):
 
     class Meta:
         ordering = ['-fecha']
-        verbose_name = 'acceso'
-        verbose_name_plural = 'registro de accesos'
+        verbose_name = 'acceso registrado'
+        verbose_name_plural = 'accesos registrados'
 
     def __str__(self):
         return f'{self.nombre_usuario}: {self.get_tipo_display()} ({self.detalle})'
