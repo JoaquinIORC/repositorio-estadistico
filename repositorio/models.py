@@ -1,16 +1,92 @@
+
 import re
+import uuid
+import zipfile
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import (
+    FileExtensionValidator,
+    MaxValueValidator,
+    MinValueValidator,
+)
 from django.db import models
 
-ENLACE_LOCAL = re.compile(r'http://(localhost|127\.0\.0\.1)(:\d+)?(/|$)')
+ENLACE_LOCAL = re.compile(
+    r'http://(localhost|127\.0\.0\.1)(:\d+)?(/|$)'
+)
+
+MAX_REPORTE_BYTES = 10 * 1024 * 1024
+
+MESES = (
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+    'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+)
 
 
 def validar_enlace(valor):
     """Exige https; en desarrollo también acepta http hacia este mismo computador."""
-    if not valor.startswith('https://') and not (settings.DEBUG and ENLACE_LOCAL.match(valor)):
+    if not valor.startswith('https://') and not (
+        settings.DEBUG and ENLACE_LOCAL.match(valor)
+    ):
         raise ValidationError('Use un enlace que comience con https://.')
+
+
+def validar_archivo_reporte(archivo):
+    """Valida tamaño, extensión y estructura básica real del archivo."""
+    if archivo.size > MAX_REPORTE_BYTES:
+        raise ValidationError('El archivo no puede superar los 10 MB.')
+
+    extension = Path(archivo.name).suffix.lower()
+
+    if extension not in ('.pdf', '.xlsx'):
+        raise ValidationError('Solo se permiten archivos PDF o XLSX.')
+
+    try:
+        archivo.seek(0)
+        encabezado = archivo.read(8)
+        archivo.seek(0)
+
+        if extension == '.pdf':
+            if not encabezado.startswith(b'%PDF-'):
+                raise ValidationError(
+                    'El contenido no corresponde a un PDF válido.'
+                )
+
+        elif extension == '.xlsx':
+            if not encabezado.startswith(b'PK'):
+                raise ValidationError(
+                    'El contenido no corresponde a un XLSX válido.'
+                )
+
+            with zipfile.ZipFile(archivo) as libro:
+                archivos = set(libro.namelist())
+                requeridos = {
+                    '[Content_Types].xml',
+                    'xl/workbook.xml',
+                }
+
+                if not requeridos.issubset(archivos):
+                    raise ValidationError(
+                        'El archivo no tiene la estructura de un XLSX válido.'
+                    )
+
+        archivo.seek(0)
+
+    except zipfile.BadZipFile:
+        raise ValidationError(
+            'El archivo Excel está dañado o no es un XLSX válido.'
+        )
+
+    finally:
+        archivo.seek(0)
+
+
+def ruta_reporte_privado(instance, filename):
+    """Guarda el archivo con nombre aleatorio, no con el nombre original."""
+    extension = Path(filename).suffix.lower()
+    return f'reportes/{instance.modulo_id}/{uuid.uuid4().hex}{extension}'
 
 
 class Modulo(models.Model):
@@ -23,14 +99,20 @@ class Modulo(models.Model):
         blank=True,
         validators=[validar_enlace],
         help_text=(
-            'Sin enlace, el módulo aparece como "En preparación". En Power BI use un informe '
-            'compartido con cuentas institucionales: un enlace "Publicar en la web" (view?r=) '
-            'lo puede abrir cualquiera que lo tenga, aunque aquí se pida sesión.'
+            'Sin enlace, el módulo aparece como "En preparación". En Power BI '
+            'use un informe compartido con cuentas institucionales: un enlace '
+            '"Publicar en la web" (view?r=) lo puede abrir cualquiera que lo '
+            'tenga, aunque aquí se pida sesión.'
         ),
     )
     corte = models.CharField(
-        'último corte', max_length=40, blank=True,
-        help_text='Por ejemplo: Noviembre 2026 o Semana 47.',
+        'último corte',
+        max_length=40,
+        blank=True,
+        help_text=(
+            'Por ejemplo: Noviembre 2026 o Semana 47. Si el módulo tiene '
+            'reportes cargados, se muestra el período del más reciente.'
+        ),
     )
     orden = models.PositiveSmallIntegerField(default=0)
     activo = models.BooleanField(default=True)
@@ -42,3 +124,56 @@ class Modulo(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class Reporte(models.Model):
+    """Archivo estadístico asociado a un módulo y período."""
+
+    modulo = models.ForeignKey(
+        Modulo,
+        on_delete=models.CASCADE,
+        related_name='reportes',
+        verbose_name='módulo',
+    )
+    titulo = models.CharField(max_length=150)
+    anio = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(2000), MaxValueValidator(2100)]
+    )
+    mes = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(12)]
+    )
+    archivo = models.FileField(
+        upload_to=ruta_reporte_privado,
+        validators=[
+            FileExtensionValidator(allowed_extensions=['pdf', 'xlsx']),
+            validar_archivo_reporte,
+        ],
+        help_text=(
+            '⚠️ No subir archivos con RUT, nombres ni datos de personas.'
+        ),
+    )
+    subido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='reportes_subidos',
+    )
+    subido_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-anio', '-mes', '-subido_en', 'titulo']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['modulo', 'titulo', 'anio', 'mes'],
+                name='reporte_modulo_titulo_periodo_unico',
+            ),
+        ]
+        verbose_name = 'reporte'
+        verbose_name_plural = 'reportes'
+
+    def __str__(self):
+        return f'{self.modulo} — {self.titulo} ({self.periodo})'
+
+    @property
+    def periodo(self):
+        """Mes y año en palabras, como lo muestra el sello: Noviembre 2026."""
+        return f'{MESES[self.mes - 1]} {self.anio}'

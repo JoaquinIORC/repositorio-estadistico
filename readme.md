@@ -8,6 +8,7 @@ Todo se hace en **Administrar**, con una cuenta de administrador:
 
 - **Agregar una herramienta:** Módulos, "Añadir módulo", con nombre, descripción, enlace `https` y último corte.
 - **Actualizar un corte:** se edita directo en la lista de módulos.
+- **Publicar un reporte mensual (IAAPS, REM u otro):** Reportes, "Añadir reporte", con módulo, título, año, mes y el archivo PDF o XLSX (hasta 10 MB). En la portada, un módulo sin enlace y con reportes muestra "Ver reportes", y su corte pasa a ser el período del reporte más reciente (por ejemplo, Noviembre 2026). Los archivos solo se descargan con sesión. No subir archivos con RUT, nombres ni otros datos de personas.
 - **Dar acceso a una persona:** Usuarios, "Añadir usuario". Con una cuenta común solo ve la portada; no marcar "Es staff" salvo que deba administrar.
 
 Cada herramienta mantiene su propio control de acceso. Per Cápita pide su ingreso, y un Power BI debe estar compartido con cuentas institucionales: un enlace "Publicar en la web" (`view?r=`) lo puede abrir cualquiera que lo tenga.
@@ -102,6 +103,11 @@ server {
     # Solo con el certificado definitivo funcionando.
     add_header Strict-Transport-Security "max-age=86400" always;
 
+    # Los reportes pesan hasta 10 MB; Nginx rechaza más de 1 MB si no se indica.
+    client_max_body_size 11m;
+
+    # Sin location /media/: los reportes se entregan solo a través de Django, que exige sesión.
+
     location /static/ {
         alias /srv/repositorio/repositorio-estadistico/staticfiles/;
     }
@@ -130,4 +136,4 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-La base es el archivo `db.sqlite3`: incluirlo en los respaldos del servidor.
+La base es el archivo `db.sqlite3` y los reportes subidos quedan en la carpeta `media/`: incluir ambos en los respaldos del servidor.
