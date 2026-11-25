@@ -33,7 +33,13 @@ python -m venv .venv
 Copy-Item .env.example .env
 ```
 
-Completar `DJANGO_SECRET_KEY` en `.env` y luego:
+Completar `DJANGO_SECRET_KEY` en `.env` con una clave nueva, que se genera con:
+
+```powershell
+.\.venv\Scripts\python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"
+```
+
+Luego:
 
 ```powershell
 .\.venv\Scripts\python manage.py migrate
@@ -56,10 +62,11 @@ Se puede correr varias veces: no duplica nada ni cambia lo que ya tiene contenid
 
 ### Si la instalación falla
 
-- **"Python was not found" o se abre la Microsoft Store:** Python no está instalado o no está en el PATH. Instalarlo desde python.org marcando "Add python.exe to PATH", y abrir una terminal nueva.
+- **"Python was not found" o se abre la Microsoft Store:** Python no está instalado o no está en el PATH. Instalarlo desde python.org marcando "Add python.exe to PATH", y abrir una terminal nueva. Si ya está instalado sin el PATH, crear el entorno con su ruta completa, por ejemplo `& "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" -m venv .venv`; después todo sigue con `.\.venv\Scripts\python`.
 - **"No matching distribution found for Django==5.2.18":** la versión de Python es menor a 3.10. Instalar una más nueva y crear `.venv` de nuevo.
 - **`ReadTimeoutError` al descargar paquetes:** la red cortó la descarga. Repetir con más tiempo de espera: `.\.venv\Scripts\pip install --timeout 120 -r requirements.txt`.
-- **`KeyError: 'DJANGO_SECRET_KEY'`:** falta el archivo `.env` o la clave está vacía.
+- **`KeyError: 'DJANGO_SECRET_KEY'`:** falta el archivo `.env`. Copiarlo desde `.env.example`.
+- **"The SECRET_KEY setting must not be empty":** el `.env` existe, pero `DJANGO_SECRET_KEY` quedó vacía. Generar una clave con el comando de arriba y pegarla.
 
 ## Despliegue en el servidor de percapitados
 
