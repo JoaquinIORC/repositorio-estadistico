@@ -23,6 +23,8 @@ Las tarjetas con enlace pasan por `/modulos/<id>/abrir/`, que anota el acceso y 
 
 Cada herramienta mantiene su propio control de acceso. Per Cápita pide su ingreso, y un Power BI debe estar compartido con cuentas institucionales: un enlace "Publicar en la web" (`view?r=`) lo puede abrir cualquiera que lo tenga.
 
+**Cuenta bloqueada:** después de 5 claves incorrectas en 15 minutos, esa cuenta no puede entrar desde ese equipo durante 15 minutos, aunque luego escriba la clave correcta. Vale para el portal y para el panel. Otras cuentas, y la misma cuenta desde otro equipo, siguen entrando. Para desbloquear antes, un superusuario borra los registros de esa cuenta en Administrar > Intentos fallidos de ingreso; ahí también se ve si alguien está probando claves.
+
 ## Desarrollo
 
 Requiere Python 3.10 o superior; con 3.9 o anterior, `pip` no encuentra Django 5.2 y la instalación falla. Ver la versión con `python --version`.
@@ -49,6 +51,8 @@ Luego:
 ```
 
 Con `DJANGO_DEBUG=True` también se aceptan enlaces `http://localhost`, para conectar el percapitados local. En el servidor se exige siempre `https`.
+
+Las páginas llevan una política de contenido (CSP, en `repositorio/seguridad.py`) que solo deja correr scripts y estilos de `static/`. Por eso, al editar plantillas, no escribir `<script>` con código ni `style="..."` dentro del HTML: ponerlos en `static/js/` o `static/css/portal.css`. Una prueba automática revisa que ninguna plantilla los tenga.
 
 ### Datos de ejemplo para una demostración
 

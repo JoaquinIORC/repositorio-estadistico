@@ -5,15 +5,21 @@ from django.contrib.auth.decorators import login_not_required
 from django.urls import path
 
 from repositorio import views
+from repositorio.ingreso import FormularioIngreso, FormularioIngresoPanel
 
 admin.site.site_header = 'Repositorio Estadístico'
 admin.site.site_title = 'Repositorio Estadístico'
+# El ingreso del panel tiene el mismo límite de intentos que el del portal.
+admin.site.login_form = FormularioIngresoPanel
 
 urlpatterns = [
     path('', views.inicio, name='inicio'),
     path(
         'ingresar/',
-        auth_views.LoginView.as_view(redirect_authenticated_user=True),
+        auth_views.LoginView.as_view(
+            redirect_authenticated_user=True,
+            authentication_form=FormularioIngreso,
+        ),
         name='login',
     ),
     path(

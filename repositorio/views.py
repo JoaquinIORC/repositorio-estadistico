@@ -4,8 +4,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
+from django.views.decorators.cache import never_cache
 
 from .models import Acceso, Categoria, Modulo, Reporte
+
+
+# Todas las páginas con sesión llevan never_cache: Cache-Control no-store, para que el
+# navegador no guarde la portada ni los reportes después de cerrar sesión.
 
 
 def modulos_visibles(usuario):
@@ -13,6 +18,7 @@ def modulos_visibles(usuario):
     return Modulo.objects.filter(activo=True).visibles_para(usuario)
 
 
+@never_cache
 @login_required
 def inicio(request):
     """Portada de las herramientas, con el último corte de cada una."""
@@ -48,6 +54,7 @@ def inicio(request):
     })
 
 
+@never_cache
 @login_required
 def abrir_modulo(request, modulo_id):
     """Anota el acceso y lleva al enlace externo del módulo."""
@@ -60,6 +67,7 @@ def abrir_modulo(request, modulo_id):
     return redirect(modulo.enlace)
 
 
+@never_cache
 @login_required
 def lista_reportes(request, modulo_id):
     """Lista los archivos disponibles de un módulo."""
@@ -73,6 +81,7 @@ def lista_reportes(request, modulo_id):
     })
 
 
+@never_cache
 @login_required
 def descargar_reporte(request, reporte_id):
     """Entrega un archivo privado solo a usuarios autenticados."""

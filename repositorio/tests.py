@@ -11,11 +11,11 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Acceso, Categoria, Modulo, Reporte, validar_archivo_reporte
+from .models import Acceso, Categoria, IntentoFallido, Modulo, Reporte, validar_archivo_reporte
 
 ENLACE = 'https://app.powerbi.com/groups/me/reports/abc'
 
@@ -672,3 +672,171 @@ class ReporteTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             duplicado.full_clean()
+
+
+class CacheTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.directorio_media = tempfile.TemporaryDirectory()
+        cls.override_media = override_settings(MEDIA_ROOT=Path(cls.directorio_media.name))
+        cls.override_media.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.override_media.disable()
+        cls.directorio_media.cleanup()
+
+    def test_las_paginas_con_sesion_no_se_guardan_en_el_navegador(self):
+        usuario = get_user_model().objects.create_user('ana')
+        modulo = Modulo.objects.create(nombre='Informes', enlace=ENLACE)
+        reporte = Reporte.objects.create(
+            modulo=modulo, titulo='IAAPS', anio=2026, mes=11, subido_por=usuario,
+            archivo=SimpleUploadedFile('r.pdf', b'%PDF-1.4 prueba', content_type='application/pdf'),
+        )
+        self.client.force_login(usuario)
+
+        for url in (
+            reverse('inicio'),
+            reverse('lista_reportes', args=[modulo.id]),
+            reverse('abrir_modulo', args=[modulo.id]),
+            reverse('descargar_reporte', args=[reporte.id]),
+        ):
+            with self.subTest(url=url):
+                respuesta = self.client.get(url)
+                self.assertIn('no-store', respuesta['Cache-Control'])
+                self.assertIn('private', respuesta['Cache-Control'])
+                respuesta.close()
+
+
+class PoliticaDeContenidoTests(TestCase):
+    def test_todas_las_paginas_llevan_la_politica(self):
+        admin = get_user_model().objects.create_superuser('jefe')
+        paginas = [self.client.get(reverse('login'))]
+        self.client.force_login(admin)
+        paginas += [self.client.get(reverse('inicio')), self.client.get('/admin/')]
+
+        for respuesta in paginas:
+            with self.subTest(url=respuesta.request['PATH_INFO']):
+                politica = respuesta['Content-Security-Policy']
+                self.assertIn("script-src 'self'", politica)
+                self.assertIn("style-src 'self'", politica)
+                self.assertIn("frame-ancestors 'none'", politica)
+
+    def test_las_plantillas_no_llevan_scripts_ni_estilos_en_la_pagina(self):
+        # Con la CSP, un <script> sin src o un style="" no funcionarían.
+        for plantilla in Path(settings.BASE_DIR, 'templates').rglob('*.html'):
+            with self.subTest(plantilla=plantilla.name):
+                texto = plantilla.read_text(encoding='utf-8')
+                self.assertIsNone(re.search(r'<script(?![^>]*\ssrc=)[^>]*>', texto))
+                self.assertNotIn('style="', texto)
+
+
+class LimiteDeIntentosTests(TestCase):
+    CLAVE = 'clave-de-prueba-9'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.ana = get_user_model().objects.create_user('ana', password=cls.CLAVE)
+        cls.beto = get_user_model().objects.create_user('beto', password=cls.CLAVE)
+        cls.jefe = get_user_model().objects.create_superuser('jefe', password=cls.CLAVE)
+
+    def ingresar(self, usuario, clave, ip='10.0.0.1', url=None, **extra):
+        cliente = Client(REMOTE_ADDR=ip, **extra)
+        respuesta = cliente.post(url or reverse('login'), {'username': usuario, 'password': clave})
+        return respuesta, cliente
+
+    def fallar(self, usuario, veces, **kwargs):
+        for numero in range(veces):
+            self.ingresar(usuario, f'mala-{numero}', **kwargs)
+
+    def test_tras_cinco_fallas_ni_la_clave_correcta_entra(self):
+        self.fallar('ana', 5)
+
+        respuesta, cliente = self.ingresar('ana', self.CLAVE)
+
+        self.assertContains(respuesta, 'demasiados intentos fallidos')
+        self.assertEqual(cliente.get(reverse('inicio')).status_code, 302)
+
+    def test_cuatro_fallas_todavia_dejan_entrar_y_se_borran(self):
+        self.fallar('ana', 4)
+
+        respuesta, _ = self.ingresar('ana', self.CLAVE)
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertFalse(IntentoFallido.objects.filter(nombre_usuario='ana').exists())
+
+    def test_otra_cuenta_de_la_misma_oficina_sigue_entrando(self):
+        self.fallar('ana', 5)
+
+        respuesta, _ = self.ingresar('beto', self.CLAVE)
+
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_la_misma_cuenta_desde_otro_equipo_sigue_entrando(self):
+        self.fallar('ana', 5, ip='10.0.0.1')
+
+        respuesta, _ = self.ingresar('ana', self.CLAVE, ip='10.0.0.2')
+
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_el_bloqueo_termina_a_los_15_minutos(self):
+        self.fallar('ana', 5)
+        IntentoFallido.objects.update(fecha=timezone.now() - timedelta(minutes=16))
+
+        respuesta, _ = self.ingresar('ana', self.CLAVE)
+
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_mismo_mensaje_aunque_la_cuenta_no_exista(self):
+        self.fallar('no-existe', 5)
+
+        respuesta, _ = self.ingresar('no-existe', 'x')
+
+        self.assertContains(respuesta, 'demasiados intentos fallidos')
+
+    def test_no_distingue_mayusculas_en_el_nombre(self):
+        self.fallar('ANA', 5)
+
+        respuesta, _ = self.ingresar('ana', self.CLAVE)
+
+        self.assertContains(respuesta, 'demasiados intentos fallidos')
+
+    def test_el_panel_tiene_el_mismo_limite(self):
+        self.fallar('jefe', 5, url='/admin/login/')
+
+        respuesta, cliente = self.ingresar('jefe', self.CLAVE, url='/admin/login/')
+
+        self.assertContains(respuesta, 'demasiados intentos fallidos')
+        self.assertEqual(cliente.get('/admin/').status_code, 302)
+
+    @override_settings(DEBUG=False)
+    def test_en_el_servidor_cuenta_la_ip_que_informa_nginx(self):
+        self.fallar('ana', 5, ip='127.0.0.1', HTTP_X_REAL_IP='200.1.1.1')
+
+        bloqueado, _ = self.ingresar('ana', self.CLAVE, ip='127.0.0.1', HTTP_X_REAL_IP='200.1.1.1')
+        otro_equipo, _ = self.ingresar('ana', self.CLAVE, ip='127.0.0.1', HTTP_X_REAL_IP='200.1.1.2')
+
+        self.assertContains(bloqueado, 'demasiados intentos fallidos')
+        self.assertEqual(otro_equipo.status_code, 302)
+
+    @override_settings(DEBUG=True)
+    def test_en_desarrollo_no_cree_en_el_encabezado(self):
+        self.fallar('ana', 5, ip='10.0.0.1', HTTP_X_REAL_IP='200.1.1.1')
+
+        respuesta, _ = self.ingresar('ana', self.CLAVE, ip='10.0.0.1', HTTP_X_REAL_IP='200.1.1.2')
+
+        self.assertContains(respuesta, 'demasiados intentos fallidos')
+
+    def test_en_el_panel_se_desbloquea_borrando_los_intentos(self):
+        self.fallar('ana', 5)
+        admin = Client()
+        admin.force_login(self.jefe)
+
+        self.assertContains(admin.get('/admin/repositorio/intentofallido/'), '5 intentos fallidos de ingreso')
+        IntentoFallido.objects.filter(nombre_usuario='ana').delete()
+        respuesta, _ = self.ingresar('ana', self.CLAVE)
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(admin.get('/admin/repositorio/intentofallido/add/').status_code, 403)
