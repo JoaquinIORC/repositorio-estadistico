@@ -55,6 +55,9 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 h1 { margin: 0 0 6px; color: var(--morado); font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; overflow-wrap: anywhere; }
 .intro { margin: 0 0 20px; color: var(--suave); max-width: 60ch; }
 
+.volver { margin: 0 0 16px; }
+.volver a { color: var(--azul); font-weight: 600; }
+
 .portada { text-align: center; }
 .portada .intro { margin-inline: auto; text-wrap: balance; }
 

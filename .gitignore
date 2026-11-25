@@ -13,3 +13,5 @@ db.sqlite3
 *.sql
 *.dump
 *.backup
+
+/media/
