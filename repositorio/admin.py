@@ -12,12 +12,24 @@ class CategoriaAdmin(admin.ModelAdmin):
 
 @admin.register(Modulo)
 class ModuloAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'categoria', 'corte', 'orden', 'nuevo', 'activo')
+    list_display = ('nombre', 'categoria', 'acceso', 'corte', 'orden', 'nuevo', 'activo')
     # El corte cambia cada semana o mes: se actualiza desde la lista.
     list_editable = ('categoria', 'corte', 'orden', 'nuevo', 'activo')
-    list_filter = ('categoria', 'activo')
+    list_filter = ('categoria', 'grupos', 'activo')
     search_fields = ('nombre', 'descripcion')
-    fields = ('nombre', 'descripcion', 'categoria', 'icono', 'enlace', 'corte', 'orden', 'nuevo', 'activo')
+    filter_horizontal = ('grupos',)
+    fields = (
+        'nombre', 'descripcion', 'categoria', 'icono', 'enlace', 'corte',
+        'grupos', 'orden', 'nuevo', 'activo',
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('grupos')
+
+    @admin.display(description='acceso')
+    def acceso(self, modulo):
+        grupos = [grupo.name for grupo in modulo.grupos.all()]
+        return ', '.join(grupos) if grupos else 'Todos'
 
 
 @admin.register(Reporte)

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -228,6 +229,87 @@ class CategoriaTests(TestCase):
 
         self.assertContains(respuesta, 'id="q" type="search"')
         self.assertContains(respuesta, 'data-buscar="REM Registro Estadístico Mensual Registros y gestión Metas"')
+
+
+class AccesoPorGrupoTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # El reporte de prueba se guarda en una carpeta temporal que se borra al terminar.
+        cls.directorio_media = tempfile.TemporaryDirectory()
+        cls.override_media = override_settings(MEDIA_ROOT=Path(cls.directorio_media.name))
+        cls.override_media.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.override_media.disable()
+        cls.directorio_media.cleanup()
+
+    @classmethod
+    def setUpTestData(cls):
+        Modulo.objects.all().delete()
+        cls.equipo = Group.objects.create(name='Equipo Per Cápita')
+        cls.comun = get_user_model().objects.create_user('comun')
+        cls.miembro = get_user_model().objects.create_user('miembro')
+        cls.miembro.groups.add(cls.equipo)
+        cls.admin = get_user_model().objects.create_superuser('jefe')
+
+        cls.abierto = Modulo.objects.create(nombre='Abierto', enlace=ENLACE, corte='Semana 47')
+        cls.restringido = Modulo.objects.create(
+            nombre='Restringido', descripcion='Solo el equipo', corte='Noviembre 2026',
+        )
+        cls.restringido.grupos.add(cls.equipo)
+        cls.reporte = Reporte.objects.create(
+            modulo=cls.restringido, titulo='Informe', anio=2026, mes=11, subido_por=cls.admin,
+            archivo=SimpleUploadedFile('r.pdf', b'%PDF-1.4 prueba', content_type='application/pdf'),
+        )
+
+    def portada(self, usuario):
+        self.client.force_login(usuario)
+        return self.client.get(reverse('inicio'))
+
+    def test_quien_no_es_del_grupo_no_ve_el_modulo_ni_su_corte(self):
+        respuesta = self.portada(self.comun)
+
+        self.assertContains(respuesta, '<b>Abierto</b>')
+        self.assertNotContains(respuesta, 'Restringido')
+        self.assertNotContains(respuesta, 'Noviembre 2026')
+
+    def test_un_miembro_del_grupo_lo_ve(self):
+        respuesta = self.portada(self.miembro)
+
+        self.assertContains(respuesta, '<b>Restringido</b>')
+        self.assertContains(respuesta, '<b>Abierto</b>')
+
+    def test_un_superusuario_ve_todo(self):
+        self.assertContains(self.portada(self.admin), '<b>Restringido</b>')
+
+    def test_un_modulo_con_dos_grupos_aparece_una_vez(self):
+        otro = Group.objects.create(name='Otro equipo')
+        self.restringido.grupos.add(otro)
+        self.miembro.groups.add(otro)
+
+        self.assertContains(self.portada(self.miembro), '<b>Restringido</b>', count=1)
+
+    def test_sin_acceso_la_lista_y_la_descarga_no_existen(self):
+        self.client.force_login(self.comun)
+
+        lista = self.client.get(reverse('lista_reportes', args=[self.restringido.id]))
+        descarga = self.client.get(reverse('descargar_reporte', args=[self.reporte.id]))
+
+        self.assertEqual(lista.status_code, 404)
+        self.assertEqual(descarga.status_code, 404)
+
+    def test_un_miembro_descarga_el_reporte(self):
+        self.client.force_login(self.miembro)
+
+        respuesta = self.client.get(reverse('descargar_reporte', args=[self.reporte.id]))
+
+        try:
+            self.assertEqual(respuesta.status_code, 200)
+        finally:
+            respuesta.close()
 
 
 class ModulosInicialesTests(TestCase):

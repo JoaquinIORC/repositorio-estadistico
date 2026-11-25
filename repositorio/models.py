@@ -136,8 +136,20 @@ class Categoria(models.Model):
         return self.nombre
 
 
+class ModuloQuerySet(models.QuerySet):
+    def visibles_para(self, usuario):
+        """Módulos sin grupos, más los de algún grupo del usuario. Un superusuario ve todos."""
+        if usuario.is_superuser:
+            return self
+        return self.filter(
+            models.Q(grupos__isnull=True) | models.Q(grupos__in=usuario.groups.all())
+        ).distinct()
+
+
 class Modulo(models.Model):
     """Una herramienta del repositorio. Se agregan desde el panel."""
+
+    objects = ModuloQuerySet.as_manager()
 
     nombre = models.CharField(max_length=80, unique=True)
     descripcion = models.CharField('descripción', max_length=200, blank=True)
@@ -172,6 +184,15 @@ class Modulo(models.Model):
         help_text=(
             'Por ejemplo: Noviembre 2026 o Semana 47. Si el módulo tiene '
             'reportes cargados, se muestra el período del más reciente.'
+        ),
+    )
+    grupos = models.ManyToManyField(
+        'auth.Group',
+        blank=True,
+        related_name='modulos',
+        help_text=(
+            'Vacío: lo ven todos los usuarios. Con grupos: solo sus miembros '
+            '(y los superusuarios). Se aplica también a sus reportes.'
         ),
     )
     orden = models.PositiveSmallIntegerField(default=0)
