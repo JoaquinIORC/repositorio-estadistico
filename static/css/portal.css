@@ -129,7 +129,7 @@ h1 { margin: 0 0 6px; color: var(--morado); font-size: clamp(1.6rem, 3vw, 2.2rem
 a.card { transition: transform .15s, border-color .15s, box-shadow .15s; }
 a.card:hover { transform: translateY(-3px); border-color: var(--c, var(--azul)); box-shadow: 0 8px 20px rgba(31, 41, 51, .12); }
 
-/* Color de la categoría: lo usan el ícono y el borde al pasar el mouse. */
+/* Color de la categoría: lo usan el ícono, el fondo y el borde de la tarjeta. */
 .color-azul { --c: var(--azul); --bg: var(--azul-claro); }
 .color-verde { --c: #1d7a4f; --bg: #e4f4ec; }
 .color-morado { --c: var(--morado); --bg: #f1e8f5; }
