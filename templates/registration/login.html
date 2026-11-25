@@ -8,6 +8,8 @@
 {% block contenido %}
 <div class="ingreso">
     <div class="ingreso-form">
+        {# Percapitados corre en el mismo computador: el nombre deja claro en qué sistema se entra. #}
+        <p class="ingreso-marca">Repositorio Estadístico</p>
         <h1>Iniciar sesión</h1>
         <p class="ingreso-subtitulo">Use la cuenta que le entregó el administrador.</p>
         {% if form.non_field_errors %}

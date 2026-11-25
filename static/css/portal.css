@@ -176,6 +176,7 @@ a.card:hover .accion { text-decoration: underline; }
 }
 
 .ingreso-form { padding: 40px 36px 34px; }
+.ingreso-marca { margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--borde); color: var(--morado); font-size: .95rem; font-weight: 700; letter-spacing: .02em; }
 .ingreso-form h1 { font-size: 1.7rem; margin-bottom: 4px; }
 .ingreso-subtitulo { margin: 0 0 22px; color: var(--suave); }
 .campo { margin-bottom: 16px; }
@@ -209,7 +210,9 @@ a.card:hover .accion { text-decoration: underline; }
 .mostrar-clave svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .aviso-mayus { margin: 6px 0 0; padding: 6px 10px; background: #fff4d6; color: #6b4a00; border-radius: 7px; font-size: .88rem; font-weight: 600; }
-.aviso-mayus:empty { display: none; }
+/* Vacío no ocupa espacio, pero sigue en la página: si se ocultara con display: none,
+   algunos lectores de pantalla no anunciarían el aviso al aparecer. */
+.aviso-mayus:empty { margin: 0; padding: 0; }
 
 .boton-ingresar { width: 100%; margin-top: 6px; padding: 12px; background: var(--morado); color: #fff; border: 0; border-radius: 9px; font: inherit; font-weight: 600; cursor: pointer; }
 .boton-ingresar:hover { background: #3a1449; }

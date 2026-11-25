@@ -48,6 +48,19 @@ class AccesoTests(TestCase):
     def test_el_ingreso_no_muestra_la_barra_superior(self):
         self.assertNotContains(self.client.get(reverse('login')), 'class="barra"')
 
+    def test_el_ingreso_dice_en_que_sistema_se_entra(self):
+        self.assertContains(
+            self.client.get(reverse('login')),
+            '<p class="ingreso-marca">Repositorio Estadístico</p>',
+        )
+
+    def test_el_aviso_de_mayusculas_queda_en_la_pagina(self):
+        # Vacío pero presente: el lector de pantalla lo anuncia cuando cambia.
+        self.assertContains(
+            self.client.get(reverse('login')),
+            '<p class="aviso-mayus" id="aviso-mayus" aria-live="polite"></p>',
+        )
+
     def test_un_usuario_comun_no_administra(self):
         self.client.force_login(self.usuario)
         self.assertNotContains(self.client.get(reverse('inicio')), 'Administrar')
