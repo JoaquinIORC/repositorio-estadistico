@@ -84,6 +84,10 @@ if not DEBUG:
     # Nginx recibe el HTTPS y lo informa con este encabezado.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Nginx redirige http a https (W008) y envía Strict-Transport-Security (W004); ver el README.
+# Hacerlo también aquí duplicaría la cabecera HSTS.
+SILENCED_SYSTEM_CHECKS = ['security.W004', 'security.W008']
+
 LANGUAGE_CODE = 'es-cl'
 TIME_ZONE = 'America/Santiago'
 USE_I18N = True
@@ -93,4 +97,8 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Los reportes solo los lee el usuario del sistema: otras cuentas del servidor no.
+FILE_UPLOAD_PERMISSIONS = 0o600
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o700
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

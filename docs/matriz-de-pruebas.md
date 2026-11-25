@@ -142,6 +142,15 @@ Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque l
 | L-03 | Solo consulta | En Registro de accesos, buscar "Añadir" o editar un registro | No se puede; un staff sin superusuario tampoco puede borrar | | Por probar | |
 | L-04 | Limpieza | Correr `borrar_accesos_antiguos --dias 365` | Borra solo los de más de un año e informa cuántos | | Por probar | |
 
+### Servidor (`feature/demo-registro-produccion`)
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| SV-01 | Revisión de Django | `manage.py check --deploy` en el servidor | "no issues (2 silenced)" | | Por probar | |
+| SV-02 | Permisos | Con la cuenta de percapitados, intentar leer `db.sqlite3`, un archivo de `media/` y `respaldos/` | "Permiso denegado" en los tres | | Por probar | |
+| SV-03 | Intentos en el panel | Enviar más de 20 ingresos fallidos seguidos a `/admin/login/` | Nginx responde 429, igual que en `/ingresar/` | | Por probar | |
+| SV-04 | Respaldo | Correr el respaldo del README y abrir la copia | La copia tiene los módulos y accesos; el `.tar.gz` tiene los reportes | | Por probar | |
+
 ### Observaciones de la primera pasada
 
 | ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |

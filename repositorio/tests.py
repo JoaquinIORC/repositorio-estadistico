@@ -73,6 +73,10 @@ class AccesoTests(TestCase):
             self.client.get('/admin/repositorio/modulo/').status_code, 302
         )
 
+    def test_los_reportes_subidos_no_los_leen_otras_cuentas(self):
+        self.assertEqual(settings.FILE_UPLOAD_PERMISSIONS, 0o600)
+        self.assertEqual(settings.FILE_UPLOAD_DIRECTORY_PERMISSIONS, 0o700)
+
     def test_sus_cookies_no_chocan_con_las_de_percapitados(self):
         self.assertNotEqual(settings.SESSION_COOKIE_NAME, 'sessionid')
         self.assertNotEqual(settings.CSRF_COOKIE_NAME, 'csrftoken')

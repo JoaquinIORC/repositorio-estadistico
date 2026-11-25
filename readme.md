@@ -84,6 +84,10 @@ chmod 600 .env
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py collectstatic --noinput
 .venv/bin/python manage.py createsuperuser
+# La carpeta de inicio queda abierta (755) para que Nginx lea staticfiles/;
+# la base y los reportes, no.
+chmod 600 db.sqlite3
+mkdir -p media && chmod 700 media
 exit
 ```
 
@@ -151,6 +155,17 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # El panel tiene su propio ingreso: mismo límite de intentos.
+    location = /admin/login/ {
+        limit_req zone=ingreso_repositorio burst=10 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:8002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8002;
         proxy_set_header Host $host;
@@ -165,4 +180,41 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-La base es el archivo `db.sqlite3` y los reportes subidos quedan en la carpeta `media/`: incluir ambos en los respaldos del servidor.
+`manage.py check --deploy` no debe mostrar avisos. Los de HSTS (W004) y redirección a HTTPS (W008) están silenciados en `config/settings.py` porque los resuelve esta configuración de Nginx.
+
+### Actualizar a una versión nueva
+
+```bash
+sudo -u repositorio -i
+cd repositorio-estadistico
+git pull
+.venv/bin/pip install -r requirements.txt gunicorn==26.2.0
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py collectstatic --noinput
+.venv/bin/python manage.py check --deploy
+exit
+sudo systemctl restart repositorio
+```
+
+Antes de `migrate`, respaldar como se indica abajo: algunas versiones agregan tablas (categorías, grupos por módulo, registro de accesos).
+
+### Respaldos
+
+La base es el archivo `db.sqlite3` y los reportes subidos quedan en la carpeta `media/`: incluir ambos en los respaldos del servidor. Copiar `db.sqlite3` mientras el sistema funciona puede dejar una copia a medias; esto saca una copia consistente:
+
+```bash
+sudo -u repositorio -i
+cd repositorio-estadistico
+mkdir -p ~/respaldos && chmod 700 ~/respaldos
+.venv/bin/python -c "import sqlite3; o = sqlite3.connect('db.sqlite3'); d = sqlite3.connect('/srv/repositorio/respaldos/db-$(date +%F).sqlite3'); o.backup(d); d.close()"
+tar czf ~/respaldos/media-$(date +%F).tar.gz media
+```
+
+La carpeta `respaldos` queda solo para el usuario `repositorio`, igual que `db.sqlite3` y `media/`: los reportes y el registro de accesos no deben quedar a la vista de otras cuentas del servidor. Si el sistema ya estaba instalado antes de este cambio, aplicar los permisos una vez:
+
+```bash
+sudo -u repositorio -i
+cd repositorio-estadistico
+chmod 600 db.sqlite3
+mkdir -p media && chmod -R go-rwx media
+```
