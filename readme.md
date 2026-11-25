@@ -11,6 +11,7 @@ Todo se hace en **Administrar**, con una cuenta de administrador:
 - **Actualizar un corte:** se edita directo en la lista de módulos.
 - **Publicar un reporte mensual (IAAPS, REM u otro):** Reportes, "Añadir reporte", con módulo, título, año, mes y el archivo PDF o XLSX (hasta 10 MB). En la portada, un módulo sin enlace y con reportes muestra "Ver reportes", y su corte pasa a ser el período del reporte más reciente (por ejemplo, Noviembre 2026). Los archivos solo se descargan con sesión. No subir archivos con RUT, nombres ni otros datos de personas.
 - **Dar acceso a una persona:** Usuarios, "Añadir usuario". Con una cuenta común solo ve la portada; no marcar "Es staff" salvo que deba administrar.
+- **Restringir un módulo a un equipo:** crear el grupo en Grupos (solo el nombre; los permisos de la lista no hacen falta), agregar a las personas en su ficha de usuario, y elegir el grupo en "Grupos" del módulo. Un módulo sin grupos lo ven todos; con grupos, solo sus miembros y los superusuarios. La restricción vale también para sus reportes, aunque se tenga el enlace directo. La columna "Acceso" de la lista de módulos muestra quién ve cada uno.
 
 Cada herramienta mantiene su propio control de acceso. Per Cápita pide su ingreso, y un Power BI debe estar compartido con cuentas institucionales: un enlace "Publicar en la web" (`view?r=`) lo puede abrir cualquiera que lo tenga.
 

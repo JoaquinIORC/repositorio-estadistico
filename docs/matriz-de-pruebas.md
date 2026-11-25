@@ -94,6 +94,7 @@ Cambios desde la primera pasada, en estas ramas:
 - `feature/integrar-iaaps-rem`: reportes IAAPS y REM de Daniel, unidos con el diseño del PR #1.
 - `feature/buscador-categorias`: secciones por categoría, buscador, íconos y etiqueta "Nuevo".
 - `fix/observaciones-pruebas`: observaciones de la primera pasada.
+- `feature/acceso-por-grupo`: módulos visibles solo para ciertos grupos de usuarios.
 
 Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque la portada cambió. R-01 a R-04 y P-01 siguen pendientes.
 
@@ -119,6 +120,17 @@ Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque l
 | C-07 | Buscador con lector de pantalla | Buscar con NVDA o Narrador | Anuncia "N herramientas encontradas" | | Por probar | |
 | C-08 | Etiqueta "Nuevo" | Marcar "Nuevo" en un módulo | La tarjeta muestra la etiqueta | | Por probar | |
 | C-09 | Tamaños de pantalla | Ver la portada en 1280, 768 y 375 px | Sin scroll horizontal; secciones y buscador legibles | | Por probar | |
+
+### Acceso por grupo (`feature/acceso-por-grupo`)
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| G-01 | Módulo sin grupos | Ingresar con una cuenta común sin grupos | Ve todos los módulos sin grupos | | Por probar | |
+| G-02 | Módulo restringido | Asignar el grupo "Per Cápita" al módulo e ingresar con una cuenta que no es del grupo | No ve la tarjeta ni su corte en el sello | | Por probar | |
+| G-03 | Miembro del grupo | Agregar la cuenta al grupo y volver a entrar | Ve la tarjeta y su corte | | Por probar | |
+| G-04 | Enlace directo | Sin ser del grupo, abrir `/modulos/<id>/` y el enlace de descarga de uno de sus reportes | Página no encontrada en ambos | | Por probar | |
+| G-05 | Superusuario | Ingresar con un superusuario | Ve todos los módulos | | Por probar | |
+| G-06 | Columna "Acceso" | Abrir Administrar > Módulos | "Todos" o el nombre de los grupos | | Por probar | |
 
 ### Observaciones de la primera pasada
 

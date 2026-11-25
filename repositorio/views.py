@@ -8,11 +8,16 @@ from django.utils.text import slugify
 from .models import Categoria, Modulo, Reporte
 
 
+def modulos_visibles(usuario):
+    """Módulos activos que el usuario puede ver, según sus grupos."""
+    return Modulo.objects.filter(activo=True).visibles_para(usuario)
+
+
 @login_required
 def inicio(request):
     """Portada de las herramientas, con el último corte de cada una."""
     modulos = list(
-        Modulo.objects.filter(activo=True)
+        modulos_visibles(request.user)
         .select_related('categoria')
         .prefetch_related('reportes')
     )
@@ -46,7 +51,8 @@ def inicio(request):
 @login_required
 def lista_reportes(request, modulo_id):
     """Lista los archivos disponibles de un módulo."""
-    modulo = get_object_or_404(Modulo, id=modulo_id, activo=True)
+    # 404 también si no tiene acceso: no confirma que el módulo existe.
+    modulo = get_object_or_404(modulos_visibles(request.user), id=modulo_id)
 
     return render(request, 'reportes/lista.html', {
         'modulo': modulo,
@@ -57,8 +63,10 @@ def lista_reportes(request, modulo_id):
 @login_required
 def descargar_reporte(request, reporte_id):
     """Entrega un archivo privado solo a usuarios autenticados."""
-    # Si el módulo se desactiva, sus archivos tampoco se pueden descargar.
-    reporte = get_object_or_404(Reporte, id=reporte_id, modulo__activo=True)
+    # Solo de módulos activos que el usuario puede ver; si no, 404 como en la lista.
+    reporte = get_object_or_404(
+        Reporte, id=reporte_id, modulo__in=modulos_visibles(request.user),
+    )
 
     try:
         archivo = reporte.archivo.open('rb')
