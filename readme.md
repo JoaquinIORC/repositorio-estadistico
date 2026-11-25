@@ -16,6 +16,8 @@ Cada herramienta mantiene su propio control de acceso. Per Cápita pide su ingre
 
 ## Desarrollo
 
+Requiere Python 3.10 o superior; con 3.9 o anterior, `pip` no encuentra Django 5.2 y la instalación falla. Ver la versión con `python --version`.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\pip install -r requirements.txt
@@ -32,6 +34,13 @@ Completar `DJANGO_SECRET_KEY` en `.env` y luego:
 ```
 
 Con `DJANGO_DEBUG=True` también se aceptan enlaces `http://localhost`, para conectar el percapitados local. En el servidor se exige siempre `https`.
+
+### Si la instalación falla
+
+- **"Python was not found" o se abre la Microsoft Store:** Python no está instalado o no está en el PATH. Instalarlo desde python.org marcando "Add python.exe to PATH", y abrir una terminal nueva.
+- **"No matching distribution found for Django==5.2.18":** la versión de Python es menor a 3.10. Instalar una más nueva y crear `.venv` de nuevo.
+- **`ReadTimeoutError` al descargar paquetes:** la red cortó la descarga. Repetir con más tiempo de espera: `.\.venv\Scripts\pip install --timeout 120 -r requirements.txt`.
+- **`KeyError: 'DJANGO_SECRET_KEY'`:** falta el archivo `.env` o la clave está vacía.
 
 ## Despliegue en el servidor de percapitados
 

@@ -86,3 +86,45 @@ Evidencia:
 ### Recomendación
 
 Se puede mostrar a Cristian lo que ya está: ingreso, portada, Per Cápita, sello y administración de módulos. Rendimientos se muestra solo después de que P-01 esté aprobado.
+
+## Segunda pasada: por probar
+
+Cambios desde la primera pasada, en estas ramas:
+
+- `feature/integrar-iaaps-rem`: reportes IAAPS y REM de Daniel, unidos con el diseño del PR #1.
+- `feature/buscador-categorias`: secciones por categoría, buscador, íconos y etiqueta "Nuevo".
+- `fix/observaciones-pruebas`: observaciones de la primera pasada.
+
+Además de estos casos, repetir A-01 a A-07, M-01 a M-07 y S-01 a S-04, porque la portada cambió. R-01 a R-04 y P-01 siguen pendientes.
+
+### Reportes (complementa R-01 a R-04)
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| R-05 | Corte desde los reportes | Subir reportes de octubre y noviembre al módulo IAAPS y REM | El sello dice "Indicadores IAAPS y REM: Noviembre 2026", aunque el corte escrito en el panel sea otro | | Por probar | |
+| R-06 | Tarjeta "Ver reportes" | Dejar el módulo sin enlace y con un reporte | La tarjeta lleva a la lista de reportes y cada uno se descarga | | Por probar | |
+| R-07 | Módulo desactivado | Desactivar el módulo y abrir el enlace de descarga de uno de sus reportes | No se descarga (página no encontrada) | | Por probar | |
+| R-08 | Archivo de 10 MB en el servidor | Subir un PDF de entre 1 y 10 MB en el servidor, con Nginx | Se guarda. Sin `client_max_body_size` Nginx lo rechaza con error 413 | | Por probar | |
+
+### Categorías y buscador
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| C-01 | Categorías iniciales | Migrar una base nueva | Per Cápita e IAAPS y REM en "Registros y gestión"; Rendimientos en "Atención de salud" | | Por probar | |
+| C-02 | Crear una categoría | Administrar > Categorías > Añadir, y asignarle un módulo | Aparece una sección nueva, en su orden y con su color | | Por probar | |
+| C-03 | Sin categoría | Quitar la categoría a un módulo | Aparece al final, en "Otras herramientas" | | Por probar | |
+| C-04 | Categoría vacía | Desactivar todos los módulos de una categoría | La sección no aparece | | Por probar | |
+| C-05 | Buscar | Escribir "vacunacion", "REM" y "urgencia" | Filtra sin distinguir mayúsculas ni tildes, y oculta las secciones sin resultados | | Por probar | |
+| C-06 | Sin resultados | Buscar una palabra que no existe | "No hay herramientas con esa palabra" | | Por probar | |
+| C-07 | Buscador con lector de pantalla | Buscar con NVDA o Narrador | Anuncia "N herramientas encontradas" | | Por probar | |
+| C-08 | Etiqueta "Nuevo" | Marcar "Nuevo" en un módulo | La tarjeta muestra la etiqueta | | Por probar | |
+| C-09 | Tamaños de pantalla | Ver la portada en 1280, 768 y 375 px | Sin scroll horizontal; secciones y buscador legibles | | Por probar | |
+
+### Observaciones de la primera pasada
+
+| ID | Caso | Pasos | Esperado | Obtenido | Estado | Evidencia |
+|---|---|---|---|---|---|---|
+| O-01 | Nombre en el ingreso | Abrir `/ingresar/` | Dice "Repositorio Estadístico" sobre "Iniciar sesión" | | Por probar | |
+| O-02 | Bloq Mayús con lector de pantalla | Activar Bloq Mayús y escribir la clave con NVDA o Narrador | Anuncia "Bloq Mayús está activado" | | Por probar | |
+| O-03 | A-04 en Chrome y Edge | Repetir A-04 en el computador de la demostración | No muestra la portada | | Por probar | |
+| O-04 | Instalación con el README | Instalar desde cero siguiendo el README, incluida la sección "Si la instalación falla" | Queda listo. Si José repite el error, anotar el texto | | Por probar | |
