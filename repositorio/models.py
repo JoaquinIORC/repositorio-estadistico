@@ -322,3 +322,19 @@ class Acceso(models.Model):
             modulo=modulo,
             detalle=detalle[:250],
         )
+
+
+class IntentoFallido(models.Model):
+    """Un ingreso con clave incorrecta. Sirve para bloquear a quien prueba claves (ver ingreso.py)."""
+
+    nombre_usuario = models.CharField('usuario', max_length=150, db_index=True)
+    ip = models.GenericIPAddressField('IP', null=True)
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = 'intento fallido de ingreso'
+        verbose_name_plural = 'intentos fallidos de ingreso'
+
+    def __str__(self):
+        return f'{self.nombre_usuario} desde {self.ip}'
