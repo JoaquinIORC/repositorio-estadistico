@@ -271,6 +271,11 @@ class Reporte(models.Model):
             raise ValidationError('Suba un archivo o escriba un enlace, pero no ambos.')
 
     @property
+    def es_pdf(self):
+        """Los PDF se pueden mostrar en el navegador; los Excel solo se descargan."""
+        return bool(self.archivo) and Path(self.archivo.name).suffix.lower() == '.pdf'
+
+    @property
     def periodo(self):
         """Mes y año en palabras, como lo muestra el sello: Noviembre 2026."""
         return f'{MESES[self.mes - 1]} {self.anio}'
@@ -282,10 +287,12 @@ class Acceso(models.Model):
     ABRIR = 'abrir'
     REPORTES = 'reportes'
     DESCARGA = 'descarga'
+    VER = 'ver'
     TIPOS = (
         (ABRIR, 'Abrió el enlace'),
         (REPORTES, 'Vio la lista de reportes'),
         (DESCARGA, 'Descargó un reporte'),
+        (VER, 'Vio un reporte en el navegador'),
     )
 
     fecha = models.DateTimeField(auto_now_add=True, db_index=True)

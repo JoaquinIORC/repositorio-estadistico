@@ -7,6 +7,7 @@ from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 
 from .models import Acceso, Categoria, Modulo, Reporte
+from .seguridad import POLITICA_PDF
 
 
 # Todas las páginas con sesión llevan never_cache: Cache-Control no-store, para que el
@@ -84,29 +85,39 @@ def lista_reportes(request, modulo_id):
 @never_cache
 @login_required
 def descargar_reporte(request, reporte_id):
-    """Entrega un archivo privado solo a usuarios autenticados."""
-    # Solo de módulos activos que el usuario puede ver; si no, 404 como en la lista.
+    """Entrega el archivo para guardarlo en el computador."""
+    return entregar_reporte(request, reporte_id, en_navegador=False)
+
+
+@never_cache
+@login_required
+def ver_reporte(request, reporte_id):
+    """Muestra el PDF en el navegador; desde ahí también se puede descargar."""
+    return entregar_reporte(request, reporte_id, en_navegador=True)
+
+
+def entregar_reporte(request, reporte_id, en_navegador):
+    """Archivo privado: solo con sesión y de módulos activos que el usuario puede ver."""
     reporte = get_object_or_404(
         Reporte, id=reporte_id, modulo__in=modulos_visibles(request.user),
     )
+    detalle = f'{reporte.modulo.nombre}: {reporte.titulo} ({reporte.periodo})'
 
     if reporte.enlace:
         # Documento publicado en otro sitio: se anota y se lleva al enlace (validado como https).
-        Acceso.anotar(
-            request.user, Acceso.ABRIR, reporte.modulo,
-            f'{reporte.modulo.nombre}: {reporte.titulo} ({reporte.periodo})',
-        )
+        Acceso.anotar(request.user, Acceso.ABRIR, reporte.modulo, detalle)
         return redirect(reporte.enlace)
+
+    if en_navegador and not reporte.es_pdf:
+        # Un Excel no se puede mostrar en el navegador: se descarga.
+        return redirect('descargar_reporte', reporte_id=reporte.id)
 
     try:
         archivo = reporte.archivo.open('rb')
     except (FileNotFoundError, OSError):
         raise Http404('El archivo del reporte no está disponible.')
 
-    Acceso.anotar(
-        request.user, Acceso.DESCARGA, reporte.modulo,
-        f'{reporte.modulo.nombre}: {reporte.titulo} ({reporte.periodo})',
-    )
+    Acceso.anotar(request.user, Acceso.VER if en_navegador else Acceso.DESCARGA, reporte.modulo, detalle)
 
     extension = Path(reporte.archivo.name).suffix.lower()
     nombre_base = slugify(reporte.titulo) or 'reporte'
@@ -117,9 +128,14 @@ def descargar_reporte(request, reporte_id):
         else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
-    return FileResponse(
+    respuesta = FileResponse(
         archivo,
-        as_attachment=True,
+        as_attachment=not en_navegador,
         filename=nombre_descarga,
         content_type=tipo_contenido,
     )
+    if en_navegador:
+        # El visor de PDF del navegador no abre con la política general (object-src 'none'):
+        # esta respuesta lleva una propia, que solo deja mostrar el PDF y nada más.
+        respuesta.headers['Content-Security-Policy'] = POLITICA_PDF
+    return respuesta

@@ -896,3 +896,89 @@ class ReporteConEnlaceTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             reporte.full_clean()
+
+
+class VerReporteTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.directorio_media = tempfile.TemporaryDirectory()
+        cls.override_media = override_settings(MEDIA_ROOT=Path(cls.directorio_media.name))
+        cls.override_media.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.override_media.disable()
+        cls.directorio_media.cleanup()
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        cls.modulo = Modulo.objects.create(nombre='Informes')
+        cls.pdf = Reporte.objects.create(
+            modulo=cls.modulo, titulo='IAAPS', anio=2026, mes=11, subido_por=cls.usuario,
+            archivo=SimpleUploadedFile('r.pdf', b'%PDF-1.4 prueba', content_type='application/pdf'),
+        )
+        cls.excel = Reporte.objects.create(
+            modulo=cls.modulo, titulo='REM', anio=2026, mes=11, subido_por=cls.usuario,
+            archivo=SimpleUploadedFile('r.xlsx', b'PK excel', content_type='application/octet-stream'),
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def test_el_pdf_se_muestra_en_el_navegador(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.pdf.id]))
+
+        try:
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertEqual(respuesta['Content-Type'], 'application/pdf')
+            self.assertTrue(respuesta['Content-Disposition'].startswith('inline'))
+            self.assertIn('no-store', respuesta['Cache-Control'])
+            self.assertEqual(respuesta['X-Content-Type-Options'], 'nosniff')
+        finally:
+            respuesta.close()
+
+    def test_el_pdf_lleva_su_propia_politica_de_contenido(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.pdf.id]))
+        respuesta.close()
+
+        politica = respuesta['Content-Security-Policy']
+        self.assertIn("default-src 'none'", politica)
+        self.assertIn("object-src 'self'", politica)
+        self.assertIn("frame-ancestors 'none'", politica)
+
+    def test_descargar_sigue_siendo_descarga(self):
+        respuesta = self.client.get(reverse('descargar_reporte', args=[self.pdf.id]))
+        respuesta.close()
+
+        self.assertTrue(respuesta['Content-Disposition'].startswith('attachment'))
+
+    def test_un_excel_no_se_muestra_se_descarga(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.excel.id]))
+
+        self.assertRedirects(respuesta, reverse('descargar_reporte', args=[self.excel.id]), fetch_redirect_response=False)
+
+    def test_la_lista_ofrece_ver_y_descargar_el_pdf(self):
+        respuesta = self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
+
+        self.assertContains(respuesta, f'href="{reverse("ver_reporte", args=[self.pdf.id])}" target="_blank"')
+        self.assertContains(respuesta, f'href="{reverse("descargar_reporte", args=[self.pdf.id])}"')
+        self.assertNotContains(respuesta, reverse('ver_reporte', args=[self.excel.id]))
+        self.assertContains(respuesta, f'href="{reverse("descargar_reporte", args=[self.excel.id])}"')
+
+    def test_ver_queda_en_el_registro(self):
+        self.client.get(reverse('ver_reporte', args=[self.pdf.id])).close()
+
+        acceso = Acceso.objects.get()
+        self.assertEqual((acceso.tipo, acceso.detalle), (Acceso.VER, 'Informes: IAAPS (Noviembre 2026)'))
+
+    def test_ver_respeta_los_grupos_y_la_sesion(self):
+        self.modulo.grupos.add(Group.objects.create(name='Equipo'))
+        self.assertEqual(self.client.get(reverse('ver_reporte', args=[self.pdf.id])).status_code, 404)
+
+        self.client.logout()
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.pdf.id]))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('login'), respuesta['Location'])
