@@ -40,6 +40,12 @@ MODULOS = {
 
 ENLACE_DE_EJEMPLO = 'https://example.org/demo/'
 
+# Documento público del DEIS (MINSAL): en la demo, el reporte REM es este enlace.
+MANUAL_REM = (
+    'https://repositoriodeis.minsal.cl/ContenidoSitioWeb2020/REM/2026/SERIE/'
+    'Manual%20Series%20REM%202026%20SERIE%20A%20BS%20BM%20DV1.2.pdf'
+)
+
 
 def pdf_de_ejemplo(lineas):
     """Un PDF válido de una página con las líneas dadas, sin depender de otras librerías."""
@@ -145,17 +151,20 @@ class Command(BaseCommand):
         if not modulo:
             return
         autor = get_user_model().objects.filter(is_superuser=True).first() or self.usuario_demo()
-        for titulo in ('IAAPS comunal', 'REM serie A'):
-            for mes in (9, 10, 11):
-                if Reporte.objects.filter(modulo=modulo, titulo=titulo, anio=2026, mes=mes).exists():
-                    continue
-                reporte = Reporte(modulo=modulo, titulo=titulo, anio=2026, mes=mes, subido_por=autor)
-                contenido = pdf_de_ejemplo([
-                    f'{titulo} - {MESES[mes - 1]} 2026',
-                    'Reporte de ejemplo para la demostración.',
-                    'Los datos no son reales.',
-                ])
-                reporte.archivo.save('ejemplo.pdf', ContentFile(contenido), save=True)
+        # Un reporte subido como archivo (PDF de ejemplo)...
+        if not Reporte.objects.filter(modulo=modulo, titulo='IAAPS comunal').exists():
+            reporte = Reporte(modulo=modulo, titulo='IAAPS comunal', anio=2026, mes=11, subido_por=autor)
+            contenido = pdf_de_ejemplo([
+                f'IAAPS comunal - {MESES[10]} 2026',
+                'Reporte de ejemplo para la demostración.',
+                'Los datos no son reales.',
+            ])
+            reporte.archivo.save('ejemplo.pdf', ContentFile(contenido), save=True)
+        # ...y otro que es un enlace a un documento publicado.
+        Reporte.objects.get_or_create(
+            modulo=modulo, titulo='Manual Series REM 2026 - Serie A', anio=2026, mes=11,
+            defaults={'enlace': MANUAL_REM, 'subido_por': autor},
+        )
 
     def usuario_demo(self):
         usuario, _ = get_user_model().objects.get_or_create(username='demo-general')
