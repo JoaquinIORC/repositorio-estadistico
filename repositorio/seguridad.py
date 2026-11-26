@@ -23,6 +23,18 @@ POLITICA = '; '.join([
 ])
 
 
+# Para un PDF que se muestra en el navegador: el visor del navegador lo necesita como
+# objeto propio (object-src 'self'); fuera de eso no se permite nada, y no se puede
+# meter dentro de otra página.
+POLITICA_PDF = '; '.join([
+    "default-src 'none'",
+    "object-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+])
+
+
 class PoliticaDeContenidoMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response

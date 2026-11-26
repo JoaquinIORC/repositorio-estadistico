@@ -4,6 +4,7 @@ import tempfile
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -16,6 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import Acceso, Categoria, IntentoFallido, Modulo, Reporte, validar_archivo_reporte
+from .remoto import MAX_BYTES, EnlaceNoPermitido, _SoloHttps, traer_pdf, verificar_destino
 
 ENLACE = 'https://app.powerbi.com/groups/me/reports/abc'
 
@@ -859,23 +861,51 @@ class ReporteConEnlaceTests(TestCase):
     def setUp(self):
         self.client.force_login(self.usuario)
 
-    def test_la_lista_lo_abre_en_otra_pestana(self):
+    def test_la_lista_ofrece_ver_y_descargar_el_manual(self):
         respuesta = self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
 
         self.assertContains(
             respuesta,
-            f'href="{reverse("descargar_reporte", args=[self.reporte.id])}" target="_blank" rel="noopener noreferrer"',
+            f'href="{reverse("ver_reporte", args=[self.reporte.id])}" target="_blank" rel="noopener noreferrer"',
         )
-        self.assertContains(respuesta, 'Abrir')
-        self.assertNotContains(respuesta, 'Descargar')
+        self.assertContains(respuesta, f'href="{reverse("descargar_reporte", args=[self.reporte.id])}"')
 
-    def test_lleva_al_enlace_y_lo_anota(self):
-        respuesta = self.client.get(reverse('descargar_reporte', args=[self.reporte.id]))
+    def test_ver_lleva_al_enlace_y_lo_anota(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.reporte.id]))
 
         self.assertRedirects(respuesta, self.MANUAL, fetch_redirect_response=False)
-        self.assertEqual(
-            Acceso.objects.get().detalle, 'Informes: Manual Series REM (Noviembre 2026)',
+        acceso = Acceso.objects.get()
+        self.assertEqual((acceso.tipo, acceso.detalle), (Acceso.VER, 'Informes: Manual Series REM (Noviembre 2026)'))
+
+    def test_descargar_trae_el_pdf_y_lo_entrega_como_descarga(self):
+        with patch('repositorio.views.traer_pdf', return_value=b'%PDF-1.4 manual') as traer:
+            respuesta = self.client.get(reverse('descargar_reporte', args=[self.reporte.id]))
+
+        traer.assert_called_once_with(self.MANUAL)
+        self.assertEqual(respuesta.content, b'%PDF-1.4 manual')
+        self.assertEqual(respuesta['Content-Type'], 'application/pdf')
+        self.assertEqual(respuesta['Content-Disposition'], 'attachment; filename="manual-series-rem-11-2026.pdf"')
+        self.assertIn('no-store', respuesta['Cache-Control'])
+        self.assertEqual(Acceso.objects.get().tipo, Acceso.DESCARGA)
+
+    def test_si_el_sitio_no_responde_abre_el_enlace(self):
+        with patch('repositorio.views.traer_pdf', side_effect=OSError('sin conexión')):
+            respuesta = self.client.get(reverse('descargar_reporte', args=[self.reporte.id]))
+
+        self.assertRedirects(respuesta, self.MANUAL, fetch_redirect_response=False)
+        self.assertEqual(Acceso.objects.get().tipo, Acceso.ABRIR)
+
+    def test_un_enlace_que_no_es_pdf_solo_se_abre(self):
+        pagina = Reporte.objects.create(
+            modulo=self.modulo, titulo='Tablero', anio=2026, mes=10,
+            enlace='https://app.powerbi.com/groups/me/reports/abc', subido_por=self.usuario,
         )
+
+        respuesta = self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
+
+        self.assertContains(respuesta, f'href="{reverse("ver_reporte", args=[pagina.id])}" target="_blank"')
+        self.assertNotContains(respuesta, f'href="{reverse("descargar_reporte", args=[pagina.id])}"')
+        self.assertContains(respuesta, 'Abrir')
 
     def test_el_corte_de_la_portada_tambien_lo_cuenta(self):
         self.assertContains(self.client.get(reverse('inicio')), '<li>Informes: Noviembre 2026</li>')
@@ -896,3 +926,186 @@ class ReporteConEnlaceTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             reporte.full_clean()
+
+
+class VerReporteTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.directorio_media = tempfile.TemporaryDirectory()
+        cls.override_media = override_settings(MEDIA_ROOT=Path(cls.directorio_media.name))
+        cls.override_media.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.override_media.disable()
+        cls.directorio_media.cleanup()
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        cls.modulo = Modulo.objects.create(nombre='Informes')
+        cls.pdf = Reporte.objects.create(
+            modulo=cls.modulo, titulo='IAAPS', anio=2026, mes=11, subido_por=cls.usuario,
+            archivo=SimpleUploadedFile('r.pdf', b'%PDF-1.4 prueba', content_type='application/pdf'),
+        )
+        cls.excel = Reporte.objects.create(
+            modulo=cls.modulo, titulo='REM', anio=2026, mes=11, subido_por=cls.usuario,
+            archivo=SimpleUploadedFile('r.xlsx', b'PK excel', content_type='application/octet-stream'),
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def test_el_pdf_se_muestra_en_el_navegador(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.pdf.id]))
+
+        try:
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertEqual(respuesta['Content-Type'], 'application/pdf')
+            self.assertTrue(respuesta['Content-Disposition'].startswith('inline'))
+            self.assertIn('no-store', respuesta['Cache-Control'])
+            self.assertEqual(respuesta['X-Content-Type-Options'], 'nosniff')
+        finally:
+            respuesta.close()
+
+    def test_el_pdf_lleva_su_propia_politica_de_contenido(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.pdf.id]))
+        respuesta.close()
+
+        politica = respuesta['Content-Security-Policy']
+        self.assertIn("default-src 'none'", politica)
+        self.assertIn("object-src 'self'", politica)
+        self.assertIn("frame-ancestors 'none'", politica)
+
+    def test_descargar_sigue_siendo_descarga(self):
+        respuesta = self.client.get(reverse('descargar_reporte', args=[self.pdf.id]))
+        respuesta.close()
+
+        self.assertTrue(respuesta['Content-Disposition'].startswith('attachment'))
+
+    def test_un_excel_no_se_muestra_se_descarga(self):
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.excel.id]))
+
+        self.assertRedirects(respuesta, reverse('descargar_reporte', args=[self.excel.id]), fetch_redirect_response=False)
+
+    def test_la_lista_ofrece_ver_y_descargar_el_pdf(self):
+        respuesta = self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
+
+        self.assertContains(respuesta, f'href="{reverse("ver_reporte", args=[self.pdf.id])}" target="_blank"')
+        self.assertContains(respuesta, f'href="{reverse("descargar_reporte", args=[self.pdf.id])}"')
+        self.assertNotContains(respuesta, reverse('ver_reporte', args=[self.excel.id]))
+        self.assertContains(respuesta, f'href="{reverse("descargar_reporte", args=[self.excel.id])}"')
+
+    def test_ver_queda_en_el_registro(self):
+        self.client.get(reverse('ver_reporte', args=[self.pdf.id])).close()
+
+        acceso = Acceso.objects.get()
+        self.assertEqual((acceso.tipo, acceso.detalle), (Acceso.VER, 'Informes: IAAPS (Noviembre 2026)'))
+
+    def test_ver_respeta_los_grupos_y_la_sesion(self):
+        self.modulo.grupos.add(Group.objects.create(name='Equipo'))
+        self.assertEqual(self.client.get(reverse('ver_reporte', args=[self.pdf.id])).status_code, 404)
+
+        self.client.logout()
+        respuesta = self.client.get(reverse('ver_reporte', args=[self.pdf.id]))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('login'), respuesta['Location'])
+
+
+
+class TraerPdfTests(TestCase):
+    """Los resguardos de repositorio/remoto.py, sin conectarse a internet."""
+
+    def direccion(self, ip):
+        return patch('repositorio.remoto.socket.getaddrinfo', return_value=[(2, 1, 6, '', (ip, 443))])
+
+    def test_solo_https(self):
+        with self.assertRaises(EnlaceNoPermitido):
+            verificar_destino('http://repositoriodeis.minsal.cl/manual.pdf')
+
+    def test_no_trae_de_la_red_interna_ni_de_este_servidor(self):
+        for ip in ('127.0.0.1', '10.0.0.5', '192.168.1.10', '169.254.169.254', '::1'):
+            with self.subTest(ip=ip), self.direccion(ip), self.assertRaises(EnlaceNoPermitido):
+                verificar_destino('https://sitio.cl/manual.pdf')
+
+    def test_acepta_una_direccion_publica(self):
+        with self.direccion('200.1.2.3'):
+            verificar_destino('https://sitio.cl/manual.pdf')
+
+    def respuesta(self, contenido):
+        falsa = MagicMock()
+        falsa.__enter__.return_value.read.return_value = contenido
+        return patch('repositorio.remoto.urllib.request.OpenerDirector.open', return_value=falsa)
+
+    def test_trae_un_pdf(self):
+        with self.direccion('200.1.2.3'), self.respuesta(b'%PDF-1.7 contenido'):
+            self.assertEqual(traer_pdf('https://sitio.cl/manual.pdf'), b'%PDF-1.7 contenido')
+
+    def test_rechaza_lo_que_no_es_pdf(self):
+        with self.direccion('200.1.2.3'), self.respuesta(b'<html>error</html>'), self.assertRaises(EnlaceNoPermitido):
+            traer_pdf('https://sitio.cl/manual.pdf')
+
+    def test_rechaza_archivos_muy_grandes(self):
+        grande = b'%PDF-' + b'0' * MAX_BYTES
+        with self.direccion('200.1.2.3'), self.respuesta(grande), self.assertRaises(EnlaceNoPermitido):
+            traer_pdf('https://sitio.cl/manual.pdf')
+
+    def test_las_redirecciones_tambien_se_revisan(self):
+        manejador = _SoloHttps()
+        with self.assertRaises(EnlaceNoPermitido):
+            manejador.redirect_request(None, None, 302, 'Found', {}, 'http://sitio.cl/otro.pdf')
+
+
+
+class FuenteDelReporteTests(TestCase):
+    ORIGINAL = 'https://repositoriodeis.minsal.cl/ContenidoSitioWeb2020/REM/2026/SERIE/Manual.pdf'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        cls.modulo = Modulo.objects.create(nombre='Informes')
+
+    def crear(self, **kwargs):
+        return Reporte.objects.create(
+            modulo=self.modulo, anio=2026, mes=11, subido_por=self.usuario,
+            enlace=self.ORIGINAL, **kwargs,
+        )
+
+    def lista(self):
+        self.client.force_login(self.usuario)
+        return self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
+
+    def test_la_tarjeta_muestra_la_fuente_con_su_enlace(self):
+        self.crear(titulo='Manual', fuente='MINSAL (DEIS)', fuente_enlace=self.ORIGINAL)
+
+        self.assertContains(
+            self.lista(),
+            f'Fuente: <a href="{self.ORIGINAL}" target="_blank" rel="noopener noreferrer">MINSAL (DEIS)',
+        )
+
+    def test_la_fuente_sin_enlace_es_solo_texto(self):
+        self.crear(titulo='Manual', fuente='MINSAL (DEIS)')
+
+        respuesta = self.lista()
+
+        self.assertContains(respuesta, '<small class="fuente">Fuente: MINSAL (DEIS)</small>')
+
+    def test_sin_fuente_no_aparece(self):
+        self.crear(titulo='Manual')
+
+        self.assertNotContains(self.lista(), 'Fuente:')
+
+    def test_el_enlace_de_la_fuente_debe_ser_https(self):
+        reporte = Reporte(
+            modulo=self.modulo, titulo='Otro', anio=2026, mes=10, subido_por=self.usuario,
+            enlace=self.ORIGINAL, fuente='MINSAL', fuente_enlace='http://minsal.cl/',
+        )
+        with self.assertRaises(ValidationError):
+            reporte.full_clean()
+
+    def test_un_nombre_con_html_se_muestra_como_texto(self):
+        self.crear(titulo='Manual', fuente='<script>alert(1)</script>')
+
+        self.assertNotContains(self.lista(), '<script>alert(1)</script>')

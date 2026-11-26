@@ -163,7 +163,7 @@ class Command(BaseCommand):
         # ...y otro que es un enlace a un documento publicado.
         Reporte.objects.get_or_create(
             modulo=modulo, titulo='Manual Series REM 2026 - Serie A', anio=2026, mes=11,
-            defaults={'enlace': MANUAL_REM, 'subido_por': autor},
+            defaults={'enlace': MANUAL_REM, 'subido_por': autor, 'fuente': 'MINSAL (DEIS)', 'fuente_enlace': MANUAL_REM},
         )
 
     def usuario_demo(self):

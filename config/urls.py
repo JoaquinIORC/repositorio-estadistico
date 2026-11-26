@@ -38,6 +38,11 @@ urlpatterns = [
         name='lista_reportes',
     ),
     path(
+        'reportes/<int:reporte_id>/ver/',
+        views.ver_reporte,
+        name='ver_reporte',
+    ),
+    path(
         'reportes/<int:reporte_id>/descargar/',
         views.descargar_reporte,
         name='descargar_reporte',

@@ -3,6 +3,7 @@ import re
 import uuid
 import zipfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -244,6 +245,18 @@ class Reporte(models.Model):
             'por ejemplo un manual del MINSAL. Se abre en otra pestaña.'
         ),
     )
+    fuente = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text='Quién publica el documento, por ejemplo: MINSAL (DEIS). Se muestra en la tarjeta.',
+    )
+    fuente_enlace = models.URLField(
+        'enlace de la fuente',
+        max_length=500,
+        blank=True,
+        validators=[validar_enlace],
+        help_text='Opcional: dónde está publicado el original (https). La fuente se muestra como enlace.',
+    )
     subido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -271,6 +284,13 @@ class Reporte(models.Model):
             raise ValidationError('Suba un archivo o escriba un enlace, pero no ambos.')
 
     @property
+    def es_pdf(self):
+        """Un PDF, subido o enlazado, se puede ver y descargar; un Excel solo se descarga."""
+        if self.enlace:
+            return urlparse(self.enlace).path.lower().endswith('.pdf')
+        return bool(self.archivo) and Path(self.archivo.name).suffix.lower() == '.pdf'
+
+    @property
     def periodo(self):
         """Mes y año en palabras, como lo muestra el sello: Noviembre 2026."""
         return f'{MESES[self.mes - 1]} {self.anio}'
@@ -282,10 +302,12 @@ class Acceso(models.Model):
     ABRIR = 'abrir'
     REPORTES = 'reportes'
     DESCARGA = 'descarga'
+    VER = 'ver'
     TIPOS = (
         (ABRIR, 'Abrió el enlace'),
         (REPORTES, 'Vio la lista de reportes'),
         (DESCARGA, 'Descargó un reporte'),
+        (VER, 'Vio un reporte en el navegador'),
     )
 
     fecha = models.DateTimeField(auto_now_add=True, db_index=True)
