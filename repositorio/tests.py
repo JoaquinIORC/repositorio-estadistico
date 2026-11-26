@@ -448,7 +448,8 @@ class CargarDemoTests(TestCase):
 
         self.assertEqual(Modulo.objects.filter(nombre='COMGES').count(), 1)
         self.assertEqual(Categoria.objects.filter(nombre='Territorio').count(), 1)
-        self.assertEqual(Reporte.objects.count(), 6)
+        self.assertEqual(Reporte.objects.count(), 2)
+        self.assertTrue(Reporte.objects.get(titulo='Manual Series REM 2026 - Serie A').enlace.startswith('https://repositoriodeis.minsal.cl/'))
         per_capita = Modulo.objects.get(nombre='Per Cápita Comunal')
         self.assertTrue(per_capita.grupos.filter(name='Equipo Per Cápita').exists())
         self.assertEqual(Modulo.objects.get(nombre='Rendimientos y Agenda').enlace, '')
@@ -469,7 +470,8 @@ class CargarDemoTests(TestCase):
     def test_los_reportes_de_ejemplo_son_pdf_validos(self):
         self.cargar(sin_usuarios=True)
 
-        for reporte in Reporte.objects.all():
+        self.assertEqual(Reporte.objects.exclude(archivo='').count(), 1)
+        for reporte in Reporte.objects.exclude(archivo=''):
             with self.subTest(reporte=str(reporte)), reporte.archivo.open('rb') as archivo:
                 validar_archivo_reporte(archivo)
                 pdf = archivo.read()
@@ -840,3 +842,57 @@ class LimiteDeIntentosTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 302)
         self.assertEqual(admin.get('/admin/repositorio/intentofallido/add/').status_code, 403)
+
+
+class ReporteConEnlaceTests(TestCase):
+    MANUAL = 'https://repositoriodeis.minsal.cl/ContenidoSitioWeb2020/REM/2026/SERIE/Manual.pdf'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        cls.modulo = Modulo.objects.create(nombre='Informes')
+        cls.reporte = Reporte.objects.create(
+            modulo=cls.modulo, titulo='Manual Series REM', anio=2026, mes=11,
+            enlace=cls.MANUAL, subido_por=cls.usuario,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def test_la_lista_lo_abre_en_otra_pestana(self):
+        respuesta = self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
+
+        self.assertContains(
+            respuesta,
+            f'href="{reverse("descargar_reporte", args=[self.reporte.id])}" target="_blank" rel="noopener noreferrer"',
+        )
+        self.assertContains(respuesta, 'Abrir')
+        self.assertNotContains(respuesta, 'Descargar')
+
+    def test_lleva_al_enlace_y_lo_anota(self):
+        respuesta = self.client.get(reverse('descargar_reporte', args=[self.reporte.id]))
+
+        self.assertRedirects(respuesta, self.MANUAL, fetch_redirect_response=False)
+        self.assertEqual(
+            Acceso.objects.get().detalle, 'Informes: Manual Series REM (Noviembre 2026)',
+        )
+
+    def test_el_corte_de_la_portada_tambien_lo_cuenta(self):
+        self.assertContains(self.client.get(reverse('inicio')), '<li>Informes: Noviembre 2026</li>')
+
+    def test_pide_archivo_o_enlace_pero_no_ambos(self):
+        datos = {'modulo': self.modulo, 'titulo': 'Otro', 'anio': 2026, 'mes': 10, 'subido_por': self.usuario}
+        sin_nada = Reporte(**datos)
+        con_ambos = Reporte(**datos, enlace=self.MANUAL, archivo=SimpleUploadedFile('r.pdf', b'%PDF-1.4 x'))
+
+        for reporte in (sin_nada, con_ambos):
+            with self.subTest(archivo=bool(reporte.archivo)), self.assertRaises(ValidationError):
+                reporte.full_clean()
+
+    def test_el_enlace_debe_ser_https(self):
+        reporte = Reporte(
+            modulo=self.modulo, titulo='Inseguro', anio=2026, mes=10,
+            enlace='http://repositoriodeis.minsal.cl/x.pdf', subido_por=self.usuario,
+        )
+        with self.assertRaises(ValidationError):
+            reporte.full_clean()

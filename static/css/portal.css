@@ -2,6 +2,7 @@
     --azul: #0b4f9c;
     --azul-claro: #e6f0fb;
     --morado: #4a1a5c;
+    --barra: #1f3a5f;
     --texto: #1f2933;
     --suave: #5b6773;
     --borde: #dde3ea;
@@ -29,7 +30,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
     outline: 3px solid var(--foco);
     outline-offset: 2px;
 }
-/* Sobre el morado, el azul no se distingue: el foco pasa a blanco. */
+/* Sobre el fondo oscuro de la barra, el azul no se distingue: el foco pasa a blanco. */
 .barra a:focus-visible, .barra button:focus-visible { outline-color: #fff; }
 
 .saltar { position: absolute; left: -999px; padding: 8px 14px; background: #fff; color: var(--azul); }
@@ -45,7 +46,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
     justify-content: space-between;
     gap: 8px 20px;
     padding: 12px 20px;
-    background: var(--morado);
+    background: var(--barra);
     color: #fff;
 }
 .marca { color: #fff; font-size: 1.1rem; font-weight: 700; text-decoration: none; }
@@ -63,6 +64,8 @@ h1 { margin: 0 0 6px; color: var(--morado); font-size: clamp(1.6rem, 3vw, 2.2rem
 .volver a { color: var(--azul); font-weight: 600; }
 
 .portada { text-align: center; }
+/* El título de la portada va en el mismo azul de la barra superior. */
+.titulo-inicio { color: var(--barra); }
 .portada .intro { margin-inline: auto; text-wrap: balance; }
 
 /* Sello: una línea separada por | en pantallas anchas, una lista en celular. */
