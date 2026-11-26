@@ -3,6 +3,7 @@ import re
 import uuid
 import zipfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -272,7 +273,9 @@ class Reporte(models.Model):
 
     @property
     def es_pdf(self):
-        """Los PDF se pueden mostrar en el navegador; los Excel solo se descargan."""
+        """Un PDF, subido o enlazado, se puede ver y descargar; un Excel solo se descarga."""
+        if self.enlace:
+            return urlparse(self.enlace).path.lower().endswith('.pdf')
         return bool(self.archivo) and Path(self.archivo.name).suffix.lower() == '.pdf'
 
     @property

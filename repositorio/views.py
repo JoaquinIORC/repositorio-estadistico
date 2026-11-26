@@ -1,12 +1,13 @@
 from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 
 from .models import Acceso, Categoria, Modulo, Reporte
+from .remoto import EnlaceNoPermitido, traer_pdf
 from .seguridad import POLITICA_PDF
 
 
@@ -104,8 +105,10 @@ def entregar_reporte(request, reporte_id, en_navegador):
     detalle = f'{reporte.modulo.nombre}: {reporte.titulo} ({reporte.periodo})'
 
     if reporte.enlace:
-        # Documento publicado en otro sitio: se anota y se lleva al enlace (validado como https).
-        Acceso.anotar(request.user, Acceso.ABRIR, reporte.modulo, detalle)
+        if not en_navegador and reporte.es_pdf:
+            return descargar_enlace(request, reporte, detalle)
+        # Ver un documento publicado en otro sitio: se anota y se lleva al enlace (validado como https).
+        Acceso.anotar(request.user, Acceso.VER if reporte.es_pdf else Acceso.ABRIR, reporte.modulo, detalle)
         return redirect(reporte.enlace)
 
     if en_navegador and not reporte.es_pdf:
@@ -138,4 +141,20 @@ def entregar_reporte(request, reporte_id, en_navegador):
         # El visor de PDF del navegador no abre con la política general (object-src 'none'):
         # esta respuesta lleva una propia, que solo deja mostrar el PDF y nada más.
         respuesta.headers['Content-Security-Policy'] = POLITICA_PDF
+    return respuesta
+
+
+def descargar_enlace(request, reporte, detalle):
+    """Trae el PDF enlazado y lo entrega como descarga; si no se puede, abre el enlace."""
+    try:
+        datos = traer_pdf(reporte.enlace)
+    except (EnlaceNoPermitido, OSError):
+        # El sitio no responde o no entrega un PDF: que al menos se pueda abrir allá.
+        Acceso.anotar(request.user, Acceso.ABRIR, reporte.modulo, detalle)
+        return redirect(reporte.enlace)
+
+    Acceso.anotar(request.user, Acceso.DESCARGA, reporte.modulo, detalle)
+    nombre = f'{slugify(reporte.titulo) or "reporte"}-{reporte.mes:02d}-{reporte.anio}.pdf'
+    respuesta = HttpResponse(datos, content_type='application/pdf')
+    respuesta['Content-Disposition'] = f'attachment; filename="{nombre}"'
     return respuesta
