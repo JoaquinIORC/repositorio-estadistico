@@ -208,7 +208,7 @@ class Modulo(models.Model):
 
 
 class Reporte(models.Model):
-    """Archivo estadístico asociado a un módulo y período."""
+    """Archivo estadístico, o enlace a un documento publicado, de un módulo y período."""
 
     modulo = models.ForeignKey(
         Modulo,
@@ -224,13 +224,24 @@ class Reporte(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(12)]
     )
     archivo = models.FileField(
+        blank=True,
         upload_to=ruta_reporte_privado,
         validators=[
             FileExtensionValidator(allowed_extensions=['pdf', 'xlsx']),
             validar_archivo_reporte,
         ],
         help_text=(
-            '⚠️ No subir archivos con RUT, nombres ni datos de personas.'
+            '⚠️ No subir archivos con RUT, nombres ni datos de personas. '
+            'Dejar vacío si el reporte es un enlace.'
+        ),
+    )
+    enlace = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[validar_enlace],
+        help_text=(
+            'En vez de subir un archivo: enlace https a un documento ya publicado, '
+            'por ejemplo un manual del MINSAL. Se abre en otra pestaña.'
         ),
     )
     subido_por = models.ForeignKey(
@@ -253,6 +264,11 @@ class Reporte(models.Model):
 
     def __str__(self):
         return f'{self.modulo} — {self.titulo} ({self.periodo})'
+
+    def clean(self):
+        super().clean()
+        if bool(self.archivo) == bool(self.enlace):
+            raise ValidationError('Suba un archivo o escriba un enlace, pero no ambos.')
 
     @property
     def periodo(self):

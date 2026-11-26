@@ -81,6 +81,14 @@ def descargar_reporte(request, reporte_id):
         Reporte, id=reporte_id, modulo__in=modulos_visibles(request.user),
     )
 
+    if reporte.enlace:
+        # Documento publicado en otro sitio: se anota y se lleva al enlace (validado como https).
+        Acceso.anotar(
+            request.user, Acceso.ABRIR, reporte.modulo,
+            f'{reporte.modulo.nombre}: {reporte.titulo} ({reporte.periodo})',
+        )
+        return redirect(reporte.enlace)
+
     try:
         archivo = reporte.archivo.open('rb')
     except (FileNotFoundError, OSError):
