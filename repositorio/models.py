@@ -245,6 +245,18 @@ class Reporte(models.Model):
             'por ejemplo un manual del MINSAL. Se abre en otra pestaña.'
         ),
     )
+    fuente = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text='Quién publica el documento, por ejemplo: MINSAL (DEIS). Se muestra en la tarjeta.',
+    )
+    fuente_enlace = models.URLField(
+        'enlace de la fuente',
+        max_length=500,
+        blank=True,
+        validators=[validar_enlace],
+        help_text='Opcional: dónde está publicado el original (https). La fuente se muestra como enlace.',
+    )
     subido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

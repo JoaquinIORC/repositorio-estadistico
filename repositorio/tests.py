@@ -1056,3 +1056,56 @@ class TraerPdfTests(TestCase):
         manejador = _SoloHttps()
         with self.assertRaises(EnlaceNoPermitido):
             manejador.redirect_request(None, None, 302, 'Found', {}, 'http://sitio.cl/otro.pdf')
+
+
+
+class FuenteDelReporteTests(TestCase):
+    ORIGINAL = 'https://repositoriodeis.minsal.cl/ContenidoSitioWeb2020/REM/2026/SERIE/Manual.pdf'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user('ana')
+        cls.modulo = Modulo.objects.create(nombre='Informes')
+
+    def crear(self, **kwargs):
+        return Reporte.objects.create(
+            modulo=self.modulo, anio=2026, mes=11, subido_por=self.usuario,
+            enlace=self.ORIGINAL, **kwargs,
+        )
+
+    def lista(self):
+        self.client.force_login(self.usuario)
+        return self.client.get(reverse('lista_reportes', args=[self.modulo.id]))
+
+    def test_la_tarjeta_muestra_la_fuente_con_su_enlace(self):
+        self.crear(titulo='Manual', fuente='MINSAL (DEIS)', fuente_enlace=self.ORIGINAL)
+
+        self.assertContains(
+            self.lista(),
+            f'Fuente: <a href="{self.ORIGINAL}" target="_blank" rel="noopener noreferrer">MINSAL (DEIS)',
+        )
+
+    def test_la_fuente_sin_enlace_es_solo_texto(self):
+        self.crear(titulo='Manual', fuente='MINSAL (DEIS)')
+
+        respuesta = self.lista()
+
+        self.assertContains(respuesta, '<small class="fuente">Fuente: MINSAL (DEIS)</small>')
+
+    def test_sin_fuente_no_aparece(self):
+        self.crear(titulo='Manual')
+
+        self.assertNotContains(self.lista(), 'Fuente:')
+
+    def test_el_enlace_de_la_fuente_debe_ser_https(self):
+        reporte = Reporte(
+            modulo=self.modulo, titulo='Otro', anio=2026, mes=10, subido_por=self.usuario,
+            enlace=self.ORIGINAL, fuente='MINSAL', fuente_enlace='http://minsal.cl/',
+        )
+        with self.assertRaises(ValidationError):
+            reporte.full_clean()
+
+    def test_un_nombre_con_html_se_muestra_como_texto(self):
+        self.crear(titulo='Manual', fuente='<script>alert(1)</script>')
+
+        self.assertNotContains(self.lista(), '<script>alert(1)</script>')

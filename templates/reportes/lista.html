@@ -26,6 +26,9 @@
                 <b>{{ reporte.titulo }}</b>
                 <small>Período: {{ reporte.periodo }}</small>
                 <small>{% if reporte.enlace %}Agregado{% else %}Subido{% endif %} el {{ reporte.subido_en|date:"d/m/Y" }}</small>
+                {% if reporte.fuente %}
+                <small class="fuente">Fuente: {% if reporte.fuente_enlace %}<a href="{{ reporte.fuente_enlace }}" target="_blank" rel="noopener noreferrer">{{ reporte.fuente }}<span class="oculto"> (se abre en otra pestaña)</span></a>{% else %}{{ reporte.fuente }}{% endif %}</small>
+                {% endif %}
                 <span class="acciones">
                     {% if reporte.es_pdf %}
                     <a class="accion" href="{% url 'ver_reporte' reporte.id %}" target="_blank" rel="noopener{% if reporte.enlace %} noreferrer{% endif %}">Ver <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="oculto"> {{ reporte.titulo }} (se abre en otra pestaña)</span></a>
