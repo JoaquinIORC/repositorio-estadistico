@@ -62,6 +62,8 @@ h1 { margin: 0 0 6px; color: var(--morado); font-size: clamp(1.6rem, 3vw, 2.2rem
 .volver a { color: var(--azul); font-weight: 600; }
 
 .portada { text-align: center; }
+/* El título de la portada va en el mismo azul de la barra superior. */
+.titulo-inicio { color: var(--barra); }
 .portada .intro { margin-inline: auto; text-wrap: balance; }
 
 /* Sello: una línea separada por | en pantallas anchas, una lista en celular. */
